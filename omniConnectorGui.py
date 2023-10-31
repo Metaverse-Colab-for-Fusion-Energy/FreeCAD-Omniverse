@@ -1576,6 +1576,9 @@ class OmniverseAssemblyPanel:
             msgBox.setText("No assembly link specified to fetch from!")
             msgBox.exec_()
         return None
+
+
+
     def flow_start_live_assy_mode(self):
         # blocked function for further development
         if self.live_mode_button.isChecked():
@@ -1592,7 +1595,6 @@ class OmniverseAssemblyPanel:
                         cmd = get_qproc_command_start_live(FreeCAD.assembly_usd_link, session_name)
                         if self.proc is None:
                             self.live_mode_button.setText('(EXPERIMENTAL) Live assembly mode ACTIVE')
-                            # self.add_new_live_layout()
                             print('Starting live sync..')
                             print(cmd)
                             self.proc = QtCore.QProcess()  # Keep a reference to the QProcess (e.g. on self) while it's running.
@@ -1617,7 +1619,6 @@ class OmniverseAssemblyPanel:
             self.kill_live_process()
 
     def kill_live_process(self):
-        #TODO: properly quit the live session
         if self.proc is not None:
             print('Sending quit command to live session ...')
             quit_cmd = 'q'
@@ -1665,17 +1666,32 @@ class OmniverseAssemblyPanel:
                 freecad_object.Placement.Base = FreeCAD.Vector(downstream_entry['transform'])
                 freecad_object.Placement.Rotation = FreeCAD.Rotation(*rotation)
 
-        # if reference_data !=['']:
-        #     step_path = str(reference_data[0]).split('.')[0]+'.stp'
-        #     reference_dict = {
-        #     "ref-path": str(reference_data[0]),
-        #     "step-path": str(step_path),
-        #     "transform": ast.literal_eval(reference_data[1]),
-        #     "rot-xyz": ast.literal_eval(reference_data[2]),
-        #     "scale": ast.literal_eval(reference_data[3])
-        #     }
-        #     prim_data.append(reference_dict)
+class live_assy_dialog(QtGui.QDialog):
 
+    def __init__(self, parent=None):
+        super(live_assy_dialog, self).__init__(parent)
+        # Create widgets
+        self.edit = QtGui.QLineEdit("Write my name here")
+        self.button = QtGui.QPushButton("Show Greetings")
+        # Create layout and add widgets
+        layout = QtGui.QVBoxLayout()
+        layout.addWidget(self.edit)
+        layout.addWidget(self.button)
+        # Set dialog layout
+        self.setLayout(layout)
+        # Add button signal to greetings slot
+        self.button.clicked.connect(self.greetings)
+
+    # Greets the user
+    def greetings(self):
+        print(f"Hello {self.edit.text()}")
+# class run_live_sync(QtCore.QObject):
+#     def __init__(self, project_link, assembly_usd_link, session_name):
+#         self.proc = QtCore.QProcess(self)
+#         self.cmd = get_qproc_command_start_live(assembly_usd_link, session_name)
+#         self.project_link
+#     def start_live_sync(self):
+#         self.proc.start("powershell", [self.cmd])
 
 
 
@@ -2276,8 +2292,22 @@ class _GetAssemblyPanel:
     def Activated(self):
         # what is done when the command is clicked
         # creates a panel with a dialog
+        # fc_main_window = FreeCADGui.getMainWindow()
+
         baseWidget = QtGui.QWidget()
         panel = OmniverseAssemblyPanel(baseWidget)
+
+
+        # baseWidget = QtGui.QDockWidget()
+        # frame = QtGui.QWidget()
+        # frame.ui = OmniverseAssemblyPanel(frame)
+        # frame.ui.setupUi(frame)
+        # baseWidget.setFeatures( QtGui.QDockWidget.DockWidgetMovable | QtGui.QDockWidget.DockWidgetFloatable|QtGui.QDockWidget.DockWidgetClosable )
+        # baseWidget.setWidget(frame)
+        # assy_panel_widget = OmniverseAssemblyPanel(baseWidget)
+        # print(type(assy_panel_widget))
+        # baseWidget.setWidget(frame)
+        # fc_main_window.addDockWidget(QtCore.Qt.LeftDockWidgetArea,baseWidget)
         # having a panel with a widget in self.form and the accept and 
         # reject functions (if needed), we can open it:
         FreeCADGui.Control.showDialog(panel)
