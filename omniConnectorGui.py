@@ -840,21 +840,23 @@ class _DownloadCmd:
         if stplink is not None:
             print('Pulling from '+stplink)
             ok, imported_object, output, error, fc_err = DownloadSTPFromNucleus(stplink, token = token)
-            output = output.split('\r\n')
-            for line in output:
-                print('OmniClient:', line)
-            print('ERRORS', error)
-            component_label = GetComponentNameFromStplink(stplink)
+            if ok==True:
+                output = output.split('\r\n')
+                for line in output:
+                    print('OmniClient:', line)
+                print('ERRORS', error)
+                component_label = GetComponentNameFromStplink(stplink)
 
-            imported_object = attachNewStringProperty(imported_object, property_name = "Label", property_value = component_label)
-            imported_object = attachNewStringProperty(imported_object, property_name = "Nucleus_link_stp", property_value = stplink)
-            imported_object = attachNewStringProperty(imported_object, property_name = "Nucleus_link_usd", property_value = usdlink)
-            imported_object = attachNewStringProperty(imported_object, property_name = "Nucleus_version_id", property_value = token)
-            t = time.localtime()
-            current_time = time.strftime(" %d %b  %Y %H:%M:%S", t)
-            imported_object = attachNewStringProperty(imported_object, property_name = "Last_Nucleus_sync_time", property_value = current_time)       
+                imported_object = attachNewStringProperty(imported_object, property_name = "Label", property_value = component_label)
+                imported_object = attachNewStringProperty(imported_object, property_name = "Nucleus_link_stp", property_value = stplink)
+                imported_object = attachNewStringProperty(imported_object, property_name = "Nucleus_link_usd", property_value = usdlink)
+                imported_object = attachNewStringProperty(imported_object, property_name = "Nucleus_version_id", property_value = token)
+                t = time.localtime()
+                current_time = time.strftime(" %d %b  %Y %H:%M:%S", t)
+                imported_object = attachNewStringProperty(imported_object, property_name = "Last_Nucleus_sync_time", property_value = current_time)       
             if ok==False:
                 msgBox = QtGui.QMessageBox()
+                msgBox.setIcon(QtGui.QMessageBox.Critical)
                 msgBox.setText(fc_err)
                 msgBox.setWindowTitle('Omniverse Connector for FreeCAD')
                 msgBox.exec_()
@@ -972,6 +974,7 @@ class _UploadCmd:
                             usdlink = usdlink_list[stplink_list.index(item)]
                         else:
                             msgBox = QtGui.QMessageBox()
+                            msgBox.setIcon(QtGui.QMessageBox.Question)
                             msgBox.setText("Failed to push to Nucleus!")
                             msgBox.exec_()
 
@@ -983,6 +986,7 @@ class _UploadCmd:
                             usdlink = stplink_list[usdlink_list.index(item)]
                         else:
                             msgBox = QtGui.QMessageBox()
+                            msgBox.setIcon(QtGui.QMessageBox.Question)
                             msgBox.setText("Failed to push to Nucleus!")
                             msgBox.exec_()
 
@@ -1418,10 +1422,10 @@ class OmniverseAssemblyPanel:
             self.current_assembly_URL_text = QtGui.QLabel(' \u274c No assembly selected.')
         # self.current_assembly_URL_text = 
         
-        self.create_new_assembly_button = QtGui.QPushButton("Create new assembly on project")
+        self.create_new_assembly_button = QtGui.QPushButton("Create new assembly from workspace objects")
         self.create_new_assembly_button.clicked.connect(self.flow_create_new_assembly)
 
-        self.open_existing_assembly_button = QtGui.QPushButton("Import existing assembly from project")
+        self.open_existing_assembly_button = QtGui.QPushButton("Import existing assembly into workspace")
         self.open_existing_assembly_button.clicked.connect(self.flow_open_existing_assembly)
 
         self.live_mode_button = QtGui.QPushButton("(EXPERIMENTAL) Live assembly mode")
@@ -1491,12 +1495,14 @@ class OmniverseAssemblyPanel:
                     self.status_header_text.setText(' Status: \u2705 Ready')
                 else:
                     msgBox = QtGui.QMessageBox()
+                    msgBox.setIcon(QtGui.QMessageBox.Warning)
                     msgBox.setText("Assembly name must start with a letter. \nIt can contain letters, digits, or underscores, and cannot contain spaces.")
                     msgBox.exec_()
                     self.flow_create_new_assembly()
         else:
             print('[WARN] No components in the current workspace have been pushed to this project! Push each item to Nucleus and try again.')
             msgBox = QtGui.QMessageBox()
+            msgBox.setIcon(QtGui.QMessageBox.Critical)
             msgBox.setText("No components in the current workspace have been pushed to this project! \nPush each item to Nucleus and try again.")
             msgBox.exec_()
 
@@ -1537,6 +1543,7 @@ class OmniverseAssemblyPanel:
         else:
             print('[WARN] No existing assemblies found for this project!')
             msgBox = QtGui.QMessageBox()
+            msgBox.setIcon(QtGui.QMessageBox.Critical)
             msgBox.setText("No existing assemblies found for this project!")
             msgBox.exec_()
     def flow_upload_assembly_changes(self):
@@ -1552,6 +1559,7 @@ class OmniverseAssemblyPanel:
         else:
             print('[WARN] No assembly link for this project specified to push to!')
             msgBox = QtGui.QMessageBox()
+            msgBox.setIcon(QtGui.QMessageBox.Warning)
             msgBox.setText("No assembly link for this project specified to push to!")
             msgBox.exec_()
         return None
@@ -1573,6 +1581,7 @@ class OmniverseAssemblyPanel:
         else:
             print('[WARN] No assembly link specified to fetch from!')
             msgBox = QtGui.QMessageBox()
+            msgBox.setIcon(QtGui.QMessageBox.Warning)
             msgBox.setText("No assembly link specified to fetch from!")
             msgBox.exec_()
         return None
@@ -1866,6 +1875,7 @@ class SpecifyOmniverseURLPanel:
                             [print('OmniClient:'+line) for line in stdout]
                             print(stderr)
                             msgBox = QtGui.QMessageBox()
+                            msgBox.setIcon(QtGui.QMessageBox.Critical)
                             msgBox.setText("Failed to create new project!")
                             msgBox.exec_()
                         elif ok==True:
@@ -1880,24 +1890,28 @@ class SpecifyOmniverseURLPanel:
                     else:
                         # print('[WARN] Failed to create new project!')
                         msgBox = QtGui.QMessageBox()
+                        msgBox.setIcon(QtGui.QMessageBox.Warning)
                         msgBox.setText("Project names cannot contain the text 'asset' or 'assembly'.")
                         msgBox.exec_()
                         self.createNewProject()
                 else:
                     # print('[WARN] Failed to create new project!')
                     msgBox = QtGui.QMessageBox()
+                    msgBox.setIcon(QtGui.QMessageBox.Warning)
                     msgBox.setText("Project names must start with a letter.\nIt can contain letters, digits, or underscores, and cannot contain spaces.")
                     msgBox.exec_()
                     self.createNewProject()
             else:
                 # print('[WARN] Failed to create new project!')
                 msgBox = QtGui.QMessageBox()
+                msgBox.setIcon(QtGui.QMessageBox.Warning)
                 msgBox.setText("No project name specified!")
                 msgBox.exec_()
                 self.createNewProject()
         else:
             # print('[WARN] Failed to create new project!')
             msgBox = QtGui.QMessageBox()
+            msgBox.setIcon(QtGui.QMessageBox.Warning)
             msgBox.setText("No hostname specified!")
             msgBox.exec_()
 
@@ -1945,12 +1959,14 @@ class SpecifyOmniverseURLPanel:
                         self.selected_asset_text.setText(' \u274c No STP asset selected.')
                         self.selected_asset_usd_text.setText(' \u274c No corresponding USD asset selected.')
                 else:
-                    msgBox = QtGui.QMessageBox.warning()
+                    msgBox = QtGui.QMessageBox()
+                    msgBox.setIcon(QtGui.QMessageBox.Warning)
                     msgBox.setText("Project links cannot contain the text 'asset' or 'assembly'.\nEnter a link with format omniverse://HOST_NAME/PROJECT_DIRECTORY . ")
                     msgBox.exec_()
                     self.inputProjectURL()       
             else:
-                msgBox = QtGui.QMessageBox.warning()
+                msgBox = QtGui.QMessageBox()
+                msgBox.setIcon(QtGui.QMessageBox.Warning)
                 msgBox.setText("Project links are folder links and must not include .usd in its path.\nEnter a link with format omniverse://HOST_NAME/PROJECT_DIRECTORY . ")
                 msgBox.exec_()
                 self.inputProjectURL()
@@ -1966,9 +1982,10 @@ class SpecifyOmniverseURLPanel:
                 _, _, permission = GetAuthCheck(savedURL, filetype='project')
                 print(permission)
                 if permission == 'NO_ACCESS':
-                    print('[ERROR] Cannot authenticate with Nucleus at '+ savedURL)
+                    print('[ERROR] Failed to authenticate with Nucleus at '+ savedURL)
                     msgBox = QtGui.QMessageBox()
-                    msgBox.setText("[ERROR] Cannot authenticate with nucleus at "+savedURL)
+                    msgBox.setIcon(QtGui.QMessageBox.Critical)
+                    msgBox.setText("[ERROR] Failed to authenticate with nucleus at "+savedURL)
                     msgBox.exec_()
                     self.currentProjectURL_text.setText('No project Nucleus URL specified.')
                     delete_project_link()
@@ -1981,6 +1998,7 @@ class SpecifyOmniverseURLPanel:
         elif currentProjectURL is not None and inputProjectURL==None:
             SaveProjectLinkAsTextFile(currentProjectURL)
             msgBox = QtGui.QMessageBox()
+            msgBox.setIcon(QtGui.QMessageBox.Warning)
             msgBox.setText("No USD link specified! \nRevert to initial Nucleus USD link at:\n"+currentProjectURL)
             msgBox.exec_()
 
@@ -1991,9 +2009,10 @@ class SpecifyOmniverseURLPanel:
                 _, _, permission = GetAuthCheck(savedURL, filetype='project')
                 print(permission)
                 if permission == 'NO_ACCESS':
-                    print('[ERROR] Cannot authenticate with Nucleus at '+ savedURL)
+                    print('[ERROR] Failed to authenticate with Nucleus at '+ savedURL)
                     msgBox = QtGui.QMessageBox()
-                    msgBox.setText("[ERROR] Cannot authenticate with nucleus at "+savedURL)
+                    msgBox.setIcon(QtGui.QMessageBox.Critical)
+                    msgBox.setText("[ERROR] Failed to authenticate with nucleus at "+savedURL)
                     msgBox.exec_()
                     self.currentProjectURL_text.setText(' \u274c No Project Nucleus URL specified.')
                     delete_project_link()
@@ -2005,6 +2024,7 @@ class SpecifyOmniverseURLPanel:
         else:
             print('[WARN] No project link specified!')
             msgBox = QtGui.QMessageBox()
+            msgBox.setIcon(QtGui.QMessageBox.Critical)
             msgBox.setText("No project link specified!")
             msgBox.exec_()
             ok = False
@@ -2053,17 +2073,20 @@ class SpecifyOmniverseURLPanel:
                 else:
                     # print('[WARN] Failed to create new project!')
                     msgBox = QtGui.QMessageBox()
+                    msgBox.setIcon(QtGui.QMessageBox.Warning)
                     msgBox.setText("Asset names must start with a letter. \nIt can contain letters, digits, or underscores, and cannot contain spaces.")
                     msgBox.exec_()
                     self.dialogBoxCreateNewAsset()
             else:
                 print('[WARN] No asset name specified!')
                 msgBox = QtGui.QMessageBox()
+                msgBox.setIcon(QtGui.QMessageBox.Warning)
                 msgBox.setText("No asset name specified!")
                 msgBox.exec_()
         else:
             print('[WARN] No project link specified or found!')
             msgBox = QtGui.QMessageBox()
+            msgBox.setIcon(QtGui.QMessageBox.Warning)
             msgBox.setText("No project link specified or found!")
             msgBox.exec_()
 
@@ -2109,6 +2132,7 @@ class SpecifyOmniverseURLPanel:
             elif item_list==None and usd_list==None:
                 print('No assets found.')
                 msg = QtGui.QMessageBox()
+                msg.setIcon(QtGui.QMessageBox.Question)
                 msg.setText('No assets found. Create new?')
                 msg.setStandardButtons(QtGui.QMessageBox.Ok | QtGui.QMessageBox.Cancel)
                 ret = msg.exec_()
@@ -2118,6 +2142,7 @@ class SpecifyOmniverseURLPanel:
         else:
             print('[WARN] No project link specified!')
             msgBox = QtGui.QMessageBox()
+            msgBox.setIcon(QtGui.QMessageBox.Warning)
             msgBox.setText("No project link specified!")
             msgBox.exec_()            
             
