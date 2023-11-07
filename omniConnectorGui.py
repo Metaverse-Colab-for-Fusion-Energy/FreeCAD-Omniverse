@@ -706,7 +706,10 @@ def GetPrimReferenceXForms(assemblyURL):
         reference_data = line.split('|')
         reference_data = [data.strip() for data in reference_data]
         if reference_data !=['']:
-            step_path = str(reference_data[0]).split('.')[0]+'.stp'
+            if '.usda' in str(reference_data[0]):
+                step_path = str(reference_data[0]).replace('.usda', '.stp')
+            elif '.usd' in str(reference_data[0]):
+                step_path = str(reference_data[0]).replace('.usd', '.stp')
             reference_dict = {
             "ref-path": str(reference_data[0]),
             "step-path": str(step_path),
