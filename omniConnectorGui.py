@@ -80,9 +80,9 @@ def ClearLocalDirectory():
             print('[ERROR] Failed to delete %s. Reason: %s' % (file_path, e))
 
 def RandomTokenGenerator():
-	characters = string.ascii_letters + string.digits  # letters and numbers
-	token = ''.join(random.choices(characters, k=5))
-	return token
+    characters = string.ascii_letters + string.digits  # letters and numbers
+    token = ''.join(random.choices(characters, k=5))
+    return token
 
 def SaveUSDLinkAsTextFile(usdlink):
     local_directory = GetLocalDirectoryName()
@@ -235,7 +235,7 @@ def GetCurrentUSDLinkNoPrint():
             usdlink=None
         return usdlink
     except IOError:
-    	return None
+        return None
 
 def GetCurrentProjectLink():
     try:
@@ -790,9 +790,19 @@ def get_assembly_component_placement(type='base'):
     return component_usd_links, placement
 
 def parse_list_into_set_srt_command_arg(input_list):
-    input_list_str = str(input_list)
+    fixed_list = []
+    for group in input_list:
+        for item in group:
+            str_item = str(item)
+            if item < 0:
+                str_item = 'min'+ str_item[1:]
+                print(str_item)
+            fixed_list.append(str_item)
+
+    input_list_str = str(fixed_list)
     no_brackets = input_list_str.replace("]", " ").replace("[", " ")
     no_parentheses = no_brackets.replace(")", " ").replace("(", " ")
+    # print(no_parentheses)
     return no_parentheses
 
 
@@ -1570,7 +1580,9 @@ class OmniverseAssemblyPanel:
         if FreeCAD.assembly_usd_link!= None:
             doc = FreeCAD.ActiveDocument
             assembly_usd_link = FreeCAD.assembly_usd_link
+            start_fetch_xform = time.time()
             stdout, stderr, prim_data =  GetPrimReferenceXForms(assembly_usd_link)
+            print('FETCH COMPONENT XFORM:', time.time()-start_fetch_xform, 's.')
             valid_freecad_objects = [obj for obj in doc.Objects if hasattr(obj, 'Nucleus_link_stp')]
             for dict_entry in prim_data:
                 stplink = dict_entry['step-path']
@@ -1800,7 +1812,7 @@ class SpecifyOmniverseURLPanel:
             self.selected_asset_text = QtGui.QLabel(" \u2705 Current STP asset URL: "+currentSTPLink)
 
         if currentProjectURL is not None:
-	        self.currentProjectURL_text = QtGui.QLabel(" \u2705 Current project URL: "+currentProjectURL)
+            self.currentProjectURL_text = QtGui.QLabel(" \u2705 Current project URL: "+currentProjectURL)
 
         if currentUSDLink is not None:
             self.selected_asset_usd_text = QtGui.QLabel(' \u2705 Corresponding USD: '+ currentUSDLink)

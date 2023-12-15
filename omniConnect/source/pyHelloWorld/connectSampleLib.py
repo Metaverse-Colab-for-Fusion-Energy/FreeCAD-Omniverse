@@ -1016,7 +1016,8 @@ def strip_suffixes(item):
 
 
 def parse_srt_list(raw_srt_list, step = 3):
-    float_list = [float(stringval) for stringval in raw_srt_list]
+    parse_list = [(stringval.replace('min', '-') if 'min' in stringval else stringval)for stringval in raw_srt_list ]
+    float_list = [float(stringval) for stringval in parse_list]
     composite_list = [float_list[x:x+step] for x in range(0, len(float_list),step)]
     return composite_list
 
@@ -1401,6 +1402,7 @@ if __name__ == "__main__":
         # func to set location and rotation for individual items in a given assembly USD
         # print(args)
         assembly_url = nucleus_url
+        # print(set_rot_xyz)
         set_rot_xyz = parse_srt_list(set_rot_xyz)
         set_transform = parse_srt_list(set_transform)
         prim_data = parse_srt_and_ref_into_dict(set_transform, set_rot_xyz, asset_usd_links)
