@@ -1342,17 +1342,17 @@ if __name__ == "__main__":
         if not asset_usd_links or not asset_stp_links: #if all of the project components are selected
             list_of_stp_urls = []
             list_of_usd_urls = []
-            result, project_folder_contents = omni.client.list(url=project_url)
+            result, project_folder_contents = omni.client.list(url=project_url)#looking for the 'assets' folder
             for folder_items in project_folder_contents:
                 # TODO: ERROR HANDLING IF RESULT NOT OK!
-                result, resolved_folder_info, resolved_absolute_url= omni.client.resolve(url=folder_items.relative_path, search_urls=[folder_url])
+                result, resolved_folder_info, resolved_absolute_url= omni.client.resolve(url=folder_items.relative_path, search_urls=[folder_url]) #getting the full URL of the 'assets' folder
                 if 'assembly' not in resolved_absolute_url:
-                    result, asset_folder_contents = omni.client.list(url=resolved_absolute_url)
+                    result, asset_folder_contents = omni.client.list(url=resolved_absolute_url) #looking for a list of available assets in the assets folder
                     for asset_items in asset_folder_contents:
-                        result, resolved_item_folder_info, resolved_item_folder_absolute_url= omni.client.resolve(url=asset_items.relative_path, search_urls=[resolved_absolute_url])
-                        result, single_asset_folder_contents = omni.client.list(url=resolved_item_folder_absolute_url)
+                        result, resolved_item_folder_info, resolved_item_folder_absolute_url= omni.client.resolve(url=asset_items.relative_path, search_urls=[resolved_absolute_url]) #getting full URL of component folder
+                        result, single_asset_folder_contents = omni.client.list(url=resolved_item_folder_absolute_url) #listing the available USD and STP files in the folder
                         for stp_or_usd_file in single_asset_folder_contents:
-                            result, resolved_item_usd_or_stp_folder_info, resolved_item_usd_or_stp_absolute_url= omni.client.resolve(url=stp_or_usd_file.relative_path, search_urls=[resolved_item_folder_absolute_url])
+                            result, resolved_item_usd_or_stp_folder_info, resolved_item_usd_or_stp_absolute_url= omni.client.resolve(url=stp_or_usd_file.relative_path, search_urls=[resolved_item_folder_absolute_url]) #getting the full URL of STP and USD files in the asset folder
                             if ".stp" in resolved_item_usd_or_stp_absolute_url:
                                 list_of_stp_urls.append(resolved_item_usd_or_stp_absolute_url)
                             if ".usd" in resolved_item_usd_or_stp_absolute_url:
