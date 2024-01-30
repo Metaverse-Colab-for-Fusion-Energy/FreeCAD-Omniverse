@@ -2059,7 +2059,7 @@ class SpecifyOmniverseURLPanel:
             assetname_prompt = QtGui.QLabel("New asset name:")
             input_assetname = QtGui.QLineEdit()
 
-            text_format_rules = QtGui.QLabel("Project names must start with a letter. \nIt can contain letters, digits, or underscores, and cannot contain spaces.")
+            text_format_rules = QtGui.QLabel("Asset names must start with a letter. \nIt can contain letters, digits, or underscores, and cannot contain spaces.")
 
             dialog.layout().insertWidget(1, assetname_prompt)
             dialog.layout().insertWidget(2, input_assetname)
