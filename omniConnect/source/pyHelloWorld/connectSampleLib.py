@@ -1066,6 +1066,7 @@ if __name__ == "__main__":
     parser.add_argument("--asset_stp_links", nargs ='+', action="store")
     parser.add_argument("--set_transform", nargs ='+', action="store")
     parser.add_argument("--set_rot_xyz", nargs ='+', action="store")
+    parser.add_argument("--make_public", action="store_true", default=False)
 
     args = parser.parse_args()
 
@@ -1099,6 +1100,7 @@ if __name__ == "__main__":
     set_transform = args.set_transform
     set_rot_xyz = args.set_rot_xyz
     move_assembly = args.move_assembly
+    make_public = args.make_public
 
     # print(args)
 
@@ -1255,9 +1257,9 @@ if __name__ == "__main__":
         app_name = 'FreeCAD'
         username = None
         username = logConnectedUsername(base_url, output_log = False)
-        if username:
+        if make_public==False:
             newpath = '/Users/'+str(username)+'/'+str(app_name)+'/'+str(project_name)
-        else:
+        elif make_public==True:
             newpath = '/Projects/'+str(app_name)+'/'+str(project_name)
         new_url = omni.client.make_url(scheme = 'omniverse', host = host_name, path = newpath)
         print(new_url)

@@ -609,13 +609,15 @@ def DownloadSTPFromNucleus(stplink, token):
             # stderr = 'DLOAD_FAIL'
     return ok, imported_object, stdout, stderr, fc_err
 
-def CreateNewProjectOnNucleus(host_name, project_name):
+def CreateNewProjectOnNucleus(host_name, project_name, make_public=False):
     
     batchfilepath = GetFetcherScriptsDirectory().replace(" ","` ")
     batchfilename = GetBatchFileName()
     batchfilepath = batchfilepath+batchfilename
-
-    cmd = batchfilepath + ' --create_new_project ' + ' --project_name ' + str(project_name) + ' --host_name ' + str(host_name)
+    if make_public ==False:
+        cmd = batchfilepath + ' --create_new_project ' + ' --project_name ' + str(project_name) + ' --host_name ' + str(host_name)
+    elif make_public ==True:
+        cmd = batchfilepath + ' --create_new_project ' + ' --project_name ' + str(project_name) + ' --host_name ' + str(host_name) + ' --make_public '
     print(cmd)
     p = subprocess.Popen(['powershell', cmd], shell=True, stdout = subprocess.PIPE, stderr = subprocess.PIPE)
     stdout, stderr = p.communicate()
@@ -1869,22 +1871,32 @@ class SpecifyOmniverseURLPanel:
         input_hostname = QtGui.QLineEdit()
         projectname_prompt = QtGui.QLabel("New project name:")
         input_projectname = QtGui.QLineEdit()
+        make_project_private_bool = QtGui.QCheckBox("Make project private")
 
         dialog.layout().insertWidget(1, hostname_prompt)
         dialog.layout().insertWidget(2, input_hostname)
         dialog.layout().insertWidget(3, projectname_prompt)
         dialog.layout().insertWidget(4, input_projectname)
         dialog.layout().insertWidget(5, text_format_rules)
+        dialog.layout().insertWidget(6, make_project_private_bool)
 
         dialog.exec_()
         # print(host_name=='')
         hostname_new_project = input_hostname.text()
         name_new_project = input_projectname.text()
+
+
+        if make_project_private_bool.isChecked() == True:
+            public_project=False
+        else:
+            public_project=True
+            
+
         if hostname_new_project!='':
             if name_new_project!='':
                 if text_follows_rules(name_new_project) ==True:
                     if no_restricted_strings_in_project_link(name_new_project) == True:
-                        ok, stdout, stderr = CreateNewProjectOnNucleus(host_name = hostname_new_project, project_name = name_new_project)
+                        ok, stdout, stderr = CreateNewProjectOnNucleus(host_name = hostname_new_project, project_name = name_new_project, make_public = public_project)
                         if ok==False:
                             print('[WARN] Failed to create new project!')
                             [print('OmniClient:'+line) for line in stdout]
