@@ -64,7 +64,7 @@ def GetBatchFileName(live=False):
     if live == False:
         batchfilename = "/run_py_omni_client.bat"
     else:
-        batchfilename = '/run_py_live_session.bat'
+        batchfilename = '/run_py_omni_live_client.bat'
     return batchfilename
 
 def ClearLocalDirectory():
