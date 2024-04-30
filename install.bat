@@ -4,6 +4,6 @@ echo 'Beginning installation of FreeCAD-Omniverse Connector'
  
 git clone https://github.com/raska-s/ovConnectSample.git temp
 
-copy .\temp\* .\omniConnect
+robocopy .\temp .\omniConnect /XO
 
-del .\temp\ -r -fo
+del .\temp
