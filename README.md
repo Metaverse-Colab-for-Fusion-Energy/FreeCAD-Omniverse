@@ -16,3 +16,8 @@ This has been tested for Windows devices (Win 10 & 11) running FreeCAD 0.20 and 
 
 ## Documentation
 > documentation to be added
+
+## TODO
+- delete useless pyfiles
+- put documentation here (there is a howto somewhere...)
+- test fresh install again
