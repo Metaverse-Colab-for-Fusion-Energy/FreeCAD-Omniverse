@@ -7,8 +7,8 @@ echo 'Pulling Connect Sample v202.0'
 git clone https://github.com/raska-s/ovConnectSample.git temp
 
 
-Remove-Item -LiteralPath ".\temp\.git" -Force -Recurse
+rd ".\temp\.git\" /q /s
 
 robocopy .\temp .\omniConnect /e
 
-Remove-Item -LiteralPath ".\temp" -Force -Recurse
+rd ".\temp\" /s /q
