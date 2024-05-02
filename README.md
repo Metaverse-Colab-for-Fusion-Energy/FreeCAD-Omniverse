@@ -1,8 +1,11 @@
 # FreeCAD Connector for NVIDIA Omniverse
 This software makes CAD geometry created on FreeCAD available on NVIDIA Omniverse in STEP and USD formats.
 
-This has been tested for Windows devices (Win 10 & 11) running FreeCAD 0.20 and 0.21, with both local and remote Omniverse Nucleus setups, using Omniverse Connect Sample 202.0. 
-
+## System requirements (what we have tested this to work on)
+- OS: Windows 10 and 11
+- FreeCAD: 0.20, 0.21.1, 0.21.2
+- Nucleus: Local and remote
+- Omniverse Connect Sample: 202.0
 ---
 
 ## Installation
