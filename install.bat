@@ -22,6 +22,8 @@ echo --- Fetching Connect Sample dependencies...
 
 call .\omniConnect\repo.bat build --fetch-only
 
+rem delete some useless pyfiles here!
+
 echo --- Fetching Python dependencies...
 
 .\omniConnect\_build\target-deps\python\python.exe -m pip install open3d aioconsole --quiet
