@@ -54,8 +54,10 @@ def GetFetcherScriptsDirectory():
 
 def GetLocalDirectoryName():
     workbench_path = os.path.dirname(os.path.realpath(__file__))
-    local_directory = workbench_path+"/junkFiles"
+    local_directory = workbench_path+"/session_local"
     return local_directory
+
+# Make a function to create the local directory if it doesnt exist yet..
 
 def GetBatchFileName(live=False):
     if live == False:

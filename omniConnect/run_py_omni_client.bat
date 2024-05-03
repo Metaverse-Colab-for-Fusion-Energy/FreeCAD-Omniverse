@@ -21,7 +21,7 @@ rem "%PYTHON%" source\pyHelloWorld\helloWorld.py %*
 
 rem "%PYTHON%" source\pyHelloWorld\connectSampleLib.py --existing_nucleus_usd omniverse://localhost/Users/test/sandbox/defeature_simplify_from_step.usda%*
 
-"%PYTHON%" source\pyHelloWorld\connectSampleLib.py %*
+"%PYTHON%" source\pyOmniFreeCAD\connectSampleLib.py %*
 
 popd
 

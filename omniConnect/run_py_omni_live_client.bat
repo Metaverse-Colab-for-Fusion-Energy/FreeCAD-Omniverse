@@ -18,7 +18,7 @@ if not exist "%PYTHON%" (
     exit /b
 )
 
-"%PYTHON%" -u source\pyHelloWorld\connectLiveTools.py %*
+"%PYTHON%" -u source\pyOmniFreeCAD\connectLiveTools.py %*
 
 popd
 

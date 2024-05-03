@@ -1,5 +1,7 @@
 @echo off
- 
+
+rem Can this be made private?? turn into an installer or something..
+
 echo === BEGINNING INSTALLATION OF FREECAD OMNIVERSE CONNECTOR ===
 
 echo --- Pulling Connect Sample v202.0...
