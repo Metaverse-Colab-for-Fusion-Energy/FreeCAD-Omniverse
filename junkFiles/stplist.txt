@@ -1,3 +1,1 @@
-omniverse://10.99.44.110/Users/raska/FreeCAD/iterProject/assets/divertor/divertor.stp
-omniverse://10.99.44.110/Users/raska/FreeCAD/iterProject/assets/iter_pv/iter_pv.stp
-omniverse://10.99.44.110/Users/raska/FreeCAD/iterProject/assets/tiles/tiles.stp
+PLACEHOLDER
