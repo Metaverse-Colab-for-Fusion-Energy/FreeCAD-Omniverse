@@ -55,9 +55,9 @@ def GetFetcherScriptsDirectory():
 def GetLocalDirectoryName():
     workbench_path = os.path.dirname(os.path.realpath(__file__))
     local_directory = workbench_path+"/session_local"
+    if not os.path.exists(local_directory):
+        os.makedirs(local_directory)
     return local_directory
-
-# Make a function to create the local directory if it doesnt exist yet..
 
 def GetBatchFileName(live=False):
     if live == False:
@@ -155,9 +155,11 @@ def delete_asset_localdata():
         try:
             os.remove(asset_data)
         except FileNotFoundError:
-            print(f"The file '{asset_data}' does not exist.")
+            # print(f"The file '{asset_data}' does not exist.")
+            pass
         except PermissionError:
-            print(f"Permission denied. Unable to delete the file '{asset_data}'.")
+            # print(f"Permission denied. Unable to delete the file '{asset_data}'.")
+            pass
         except Exception as e:
             print(f"An error occurred while deleting the file '{asset_data}': {str(e)}")
 
@@ -318,9 +320,11 @@ def GetAuthCheck(usdlink, filetype='usd'):
     error_code_link_not_found = 'NOT_FOUND'
     error_code_no_auth = 'NO_AUTH'
     print('Validating connection with '+usdlink)
-    
+
     cmd = batchfilepath + ' --nucleus_url'+' '+ usdlink + ' --auth'
-    print(cmd)
+    if filetype =='project':
+        cmd = batchfilepath + ' --nucleus_url'+' '+ usdlink + ' --auth_project'
+
     # print(cmd) # FOR DEBUG
     p = subprocess.Popen(['powershell', cmd], shell=True, stdout = subprocess.PIPE, stderr = subprocess.PIPE)
     stdout, stderr = p.communicate()
@@ -550,14 +554,10 @@ def DownloadSTPFromNucleus(stplink, token):
         fc_err = '[ERROR] NO_PERMISSION: Cannot access STP file: '+ stplink
         print('[ERROR] You do not have permissions to access this file! Contact your Nucleus administrator.')
         print('Try logging in under a different username: log out through the nucleus.')
-        # stdout='FAIL'
-        # stderr='NO_PERMISSION'
     elif permission is None:
         print('[ERROR] PERMISSION_NOT_FOUND: Cannot access STP file: '+ stplink)
         fc_err = '[ERROR] PERMISSION_NOT_FOUND: Cannot access STP file: '+ stplink
         print('[ERROR] You have not entered a valid Nucleus link.')
-        # stdout='FAIL'
-        # stderr='PERMISSION_NOT_FOUND'
     elif permission == 'OK_ACCESS':        
         doc = FreeCAD.ActiveDocument
         FreeCAD.setActiveDocument(doc.Name)
@@ -570,7 +570,6 @@ def DownloadSTPFromNucleus(stplink, token):
         # local directory where copies are staged
         local_directory_path = GetLocalDirectoryName()
         # A one-time token for fetching to make sure get the right file. This needs to be a random string
-        # token = str(RandomTokenGenerator())
         print('Unique version identifier: '+token)
 
         local_STP_filepath = local_directory_path +'/'+token+'download.stp'
@@ -597,9 +596,6 @@ def DownloadSTPFromNucleus(stplink, token):
             fc_err = '[ERROR] DLOAD_FAIL: STP download failed!'
             print(fc_err)
             ok=False
-            # print('If error persists, clear junk and try again. Note: user needs to reinput URL after clear junk.')
-            # stdout = 'FAIL'
-            # stderr = 'DLOAD_FAIL'
     return ok, imported_object, stdout, stderr, fc_err
 
 def CreateNewProjectOnNucleus(host_name, project_name, make_public=False):
@@ -738,6 +734,7 @@ def CreateNewAssetOnNucleus(asset_name, use_url = True, projectURL=None, host_na
     # print(stdout[-1])
     stdout = stdout.split('\n')
     stderr = stderr.split('\n')
+    error = None
     for line in stdout:
         line = line.strip()
         if '.usd' in line:
@@ -746,7 +743,11 @@ def CreateNewAssetOnNucleus(asset_name, use_url = True, projectURL=None, host_na
         if '.stp' in line:
             stplink = line
             print(line)
-    return stdout, stderr, stplink, usdlink
+        if 'ERROR' in line:
+            error = line
+            stplink = None
+            usdlink = None
+    return stdout, stderr, stplink, usdlink, error
 
 def GetComponentNameFromStplink(stplink):
     return str(stplink.split('/')[-1]).split('.')[0]
@@ -872,18 +873,6 @@ class _DownloadCmd:
                 msgBox.setWindowTitle('Omniverse Connector for FreeCAD')
                 msgBox.exec_()
 
-               
-
-        #DEPRECATED SINCE MOVE INTERCHANGE FORMAT TO STP
-        # usdlink = GetCurrentUSDLink()
-        # if usdlink is not None:
-        #     print('Pulling from '+usdlink)
-        #     output, error = DownloadUSDFromNucleus(usdlink)
-        #     output = output.split('\r\n')
-        #     for line in output:
-        #         print('OmniClient:', line)
-        #     print('ERRORS', error)
-
     def GetResources(self):
         # icon and command information
         MenuText = QtCore.QT_TRANSLATE_NOOP(
@@ -918,8 +907,9 @@ class _DownloadCmd:
         return is_checksValid
 
 class _ClearJunkCmd:
-
-    
+    """
+    Command to clear session data
+    """
     def Activated(self):
         # what is done when the command is clicked
         current_project_link = GetCurrentProjectLinkNoPrint()
@@ -935,20 +925,18 @@ class _ClearJunkCmd:
         # icon and command information
         MenuText = QtCore.QT_TRANSLATE_NOOP(
             'OVconnect_clear_junk_files',
-            'Clear local junk files')
+            'Clear current session')
         ToolTip = QtCore.QT_TRANSLATE_NOOP(
             'OVconnect_clear_junk_files',
-            'Clear local junk files')
+            'Clear current session')
         return {
             'Pixmap': __dir__ + '/icons/OVConnect_clearjunk.svg',
             'MenuText': MenuText,
             'ToolTip': ToolTip}
 
     def IsActive(self):
-        # The command will be active if there is an active document
+        # The command will be active only if there is an active document
         return not FreeCAD.ActiveDocument is None
-
-
 
 
 # GUI command that links the Python script
@@ -1049,7 +1037,7 @@ class _UploadCmd:
             'ToolTip': ToolTip}
 
     def IsActive(self):
-
+        # Upload button only active when: STPlink and USDlink has been saved, permission to both are OK, and there is an active document on freecad
         usd_permission = GetCurrentUSDPermissions()
         usd_URL = GetCurrentUSDLinkNoPrint()
 
@@ -1067,14 +1055,11 @@ class _UploadCmd:
         is_activeDocumentExists = not FreeCAD.ActiveDocument is None
 
         is_checksValid = is_activeDocumentExists == True and is_stpSideValid==True and is_usdSideValid==True
-
-
-        # The command will be active if the above checks all return True! - measure against invalid upload
         return is_checksValid
 
 class _CheckConnectionCmd:
     """DEPRECATED CLASS!
-    placeholder command to test user authetication"""
+    placeholder command to test user authetication - this is now automated"""
     
     def Activated(self):
         # what is done when the command is clicked
@@ -1112,8 +1097,8 @@ def GetListOfAssemblyObjects(projectURL):
     return object_list, object_label_list
 
 
-class ChecklistDialog(QtGui.QDialog):
-
+class AssemblyChecklistDialog(QtGui.QDialog):
+# Checklist Dialog for creating new assembly - user can select assembly components and set assembly name
     def __init__(
         self,
         name,
@@ -1122,7 +1107,7 @@ class ChecklistDialog(QtGui.QDialog):
         icon=None,
         parent=None,
         ):
-        super(ChecklistDialog, self).__init__(parent)
+        super(AssemblyChecklistDialog, self).__init__(parent)
 
         self.name = name
         self.icon = icon
@@ -1144,13 +1129,9 @@ class ChecklistDialog(QtGui.QDialog):
         self.selectButton = QtGui.QPushButton('Select All')
         self.unselectButton = QtGui.QPushButton('Unselect All')
 
-        
-
         self.assembly_name_text = QtGui.QLabel('New assembly name:')
         self.assembly_name_input = QtGui.QLineEdit()
         self.assembly_items_text = QtGui.QLabel('Select assembly items:')
-
-        
 
         hbox = QtGui.QHBoxLayout()
         hbox.addStretch(1)
@@ -1182,7 +1163,6 @@ class ChecklistDialog(QtGui.QDialog):
                         if self.model.item(i).checkState()
                         == QtCore.Qt.Checked]
         self.assembly_name = self.assembly_name_input.text()
-        # TODO: error box opens up when assembly name is none
         self.accept()
 
     def select(self):
@@ -1302,37 +1282,46 @@ class OmniverseAssemblyPanel:
     def flow_create_new_assembly(self):
         uploaded_components_list, uploaded_components_label_list = GetListOfAssemblyObjects(self.currentProjectURL)
         if uploaded_components_list != []:
-            form = ChecklistDialog('Create new assembly', uploaded_components_label_list, checked=True)
+            form = AssemblyChecklistDialog('Create new assembly', uploaded_components_label_list, checked=True)
             if form.exec_() == QtGui.QDialog.Accepted:
                 # print(form.choices)
                 selected_object_label_list = form.choices
                 self.assembly_name = form.assembly_name
-                if text_follows_rules(self.assembly_name) ==True:
-                    self.selected_objects = GetSelectedAssemblyObjects(uploaded_components_list, uploaded_components_label_list, selected_object_label_list)
-                    print(self.assembly_name)
-                    for obj in self.selected_objects:
-                        print(obj.Label, obj.Nucleus_link_usd, obj.Nucleus_link_stp)
-                    self.assembly_items_usd_links = [obj.Nucleus_link_usd for obj in self.selected_objects]
-                    self.assembly_items_stp_links = [obj.Nucleus_link_stp for obj in self.selected_objects]
+                if self.assembly_name !='':
+                    if text_follows_rules(self.assembly_name) ==True:
+                        self.selected_objects = GetSelectedAssemblyObjects(uploaded_components_list, uploaded_components_label_list, selected_object_label_list)
+                        print(self.assembly_name)
+                        for obj in self.selected_objects:
+                            print(obj.Label, obj.Nucleus_link_usd, obj.Nucleus_link_stp)
+                        self.assembly_items_usd_links = [obj.Nucleus_link_usd for obj in self.selected_objects]
+                        self.assembly_items_stp_links = [obj.Nucleus_link_stp for obj in self.selected_objects]
 
-                    stdout, stderr, assembly_usd_link = CreateNewAssemblyOnNucleus(self.currentProjectURL, 
-                        assembly_name = self.assembly_name, 
-                        assembly_items_usd_links=self.assembly_items_usd_links, 
-                        assembly_items_stp_links=self.assembly_items_stp_links)
+                        stdout, stderr, assembly_usd_link = CreateNewAssemblyOnNucleus(self.currentProjectURL, 
+                            assembly_name = self.assembly_name, 
+                            assembly_items_usd_links=self.assembly_items_usd_links, 
+                            assembly_items_stp_links=self.assembly_items_stp_links)
 
-                    for line in stdout:
-                        print('OmniClient', line)
-                    for line in stderr:
-                        print('ERRORS', line)
+                        for line in stdout:
+                            print('OmniClient', line)
+                        for line in stderr:
+                            print('ERRORS', line)
 
-                    print(assembly_usd_link)
-                    FreeCAD.assembly_usd_link = assembly_usd_link
-                    self.current_assembly_URL_text.setText(' \u2705 Current assembly: '+FreeCAD.assembly_usd_link)
-                    self.status_header_text.setText(' Status: \u2705 Ready')
+                        print(assembly_usd_link)
+                        FreeCAD.assembly_usd_link = assembly_usd_link
+                        self.current_assembly_URL_text.setText(' \u2705 Current assembly: '+FreeCAD.assembly_usd_link)
+                        self.status_header_text.setText(' Status: \u2705 Ready')
+
+                    else:
+                        msgBox = QtGui.QMessageBox()
+                        msgBox.setIcon(QtGui.QMessageBox.Warning)
+                        msgBox.setText("Assembly name must start with a letter. \nIt can contain letters, digits, or underscores, and cannot contain spaces.")
+                        msgBox.exec_()
+                        self.flow_create_new_assembly()
+
                 else:
                     msgBox = QtGui.QMessageBox()
                     msgBox.setIcon(QtGui.QMessageBox.Warning)
-                    msgBox.setText("Assembly name must start with a letter. \nIt can contain letters, digits, or underscores, and cannot contain spaces.")
+                    msgBox.setText("No assembly name inputted!\nAssembly name must start with a letter. \nIt can contain letters, digits, or underscores, and cannot contain spaces.")
                     msgBox.exec_()
                     self.flow_create_new_assembly()
         else:
@@ -1372,9 +1361,6 @@ class OmniverseAssemblyPanel:
                     imported_obj.Placement.Base = FreeCAD.Vector(dict_entry['transform'])
                     imported_obj.Placement.Rotation = FreeCAD.Rotation(*rotation)
                     print('FETCH SINGLE COMPONENT:', time.time()-start_fetch_geom, 's.')
-
-
-                
         else:
             print('[WARN] No existing assemblies found for this project!')
             msgBox = QtGui.QMessageBox()
@@ -1425,9 +1411,8 @@ class OmniverseAssemblyPanel:
 
 
     def flow_start_live_assy_mode(self):
-        # blocked function for further development
+        # function to start live assembly mode (Omni > FreeCAD only at current state)
         if self.live_mode_button.isChecked():
-            
             if FreeCAD.assembly_usd_link !=None:
                 success, list_of_sessions, error_code = live_get_available_sessions(FreeCAD.assembly_usd_link)
                 print('SUCCESS:', success)
@@ -1511,9 +1496,8 @@ class OmniverseAssemblyPanel:
                 freecad_object.Placement.Base = FreeCAD.Vector(downstream_entry['transform'])
                 freecad_object.Placement.Rotation = FreeCAD.Rotation(*rotation)
 
-
-
 def get_qproc_command_start_live(usdlink, session_name):
+    # Returns the command needed to start live process
     doc = FreeCAD.ActiveDocument
     FreeCAD.setActiveDocument(doc.Name)
     currentProjectURL = GetCurrentProjectLinkNoPrint()
@@ -1532,8 +1516,6 @@ def get_qproc_command_start_live(usdlink, session_name):
 
 async def run_live_assembly_listener(assembly_link, session_name):
     asyncio.new_event_loop().create_task(live_start_session(FreeCAD.assembly_usd_link, session_name))
-
-
 
 def MoveAssemblyXformPositions(assemblyURL, component_usd_links, xform_translate, xform_rotation):
     batchfilepath = GetFetcherScriptsDirectory().replace(" ","` ")
@@ -1586,19 +1568,18 @@ def no_restricted_strings_in_project_link(projectlink):
     asset_in_link = 'asset' in projectlink
     return not(asset_in_link or assembly_in_link)
 
-class SpecifyOmniverseURLPanel:
+class OmniConnectionSettingsPanel:
+    # Omniverse connection settings panel
     def __init__(self,widget):
 
         self.form = widget
         layout = QtGui.QVBoxLayout()
-        self.URL_TextLabel = QtGui.QLabel("Input project URL:")
         self.panel_name_text = QtGui.QLabel("Omniverse Connection Settings")
 
         currentProjectURL = GetCurrentProjectLinkNoPrint()
         currentSTPLink = GetCurrentSTPLinkNoPrint()
         currentUSDLink = GetCurrentUSDLinkNoPrint()
         
-
         self.currentProjectURL_text = QtGui.QLabel(" \u274c No project Nucleus URL specified ")
         self.selected_asset_text = QtGui.QLabel(" \u274c No STP asset selected.")
         self.selected_asset_usd_text = QtGui.QLabel(' \u274c No corresponding USD asset selected.')
@@ -1617,31 +1598,27 @@ class SpecifyOmniverseURLPanel:
         self.create_new_project_button = QtGui.QPushButton("Create new project")
         self.create_new_project_button.clicked.connect(self.createNewProject)
 
-        # The layout will be horizontal
-        # Spin Box that takes doubles
         self.settings_label = QtGui.QLabel('Omniverse Connector Settings')
-        self.URL_Text = QtGui.QLineEdit()
 
         self.create_asset_button = QtGui.QPushButton("Create new asset in project")
         self.create_asset_button.clicked.connect(self.dialogBoxCreateNewAsset)
 
         self.browse_button = QtGui.QPushButton("Browse project assets")
         self.browse_button.clicked.connect(self.getListItem)
-        # todo - maybe turn into refresh connection/check connection
-        self.check_button = QtGui.QPushButton("Validate link")
-        self.check_button.clicked.connect(self.checkProjectURL)
-        # Default value
-        self.URL_Text.setPlaceholderText('omniverse://hostname/path/to/your/project')
-        
+
         layout.addWidget(self.panel_name_text)
         layout.addWidget(self.open_existing_project_button)
-        layout.addWidget(self.create_new_project_button)
-        # layout.addWidget(self.check_button)
+        layout.addWidget(self.create_new_project_button)        
         layout.addWidget(self.create_asset_button)
         layout.addWidget(self.browse_button)
         layout.addWidget(self.currentProjectURL_text)
         layout.addWidget(self.selected_asset_text)
         layout.addWidget(self.selected_asset_usd_text)
+
+        # Deprecated refresh connection/check connection fuction
+        # self.check_button = QtGui.QPushButton("Validate link")
+        # self.check_button.clicked.connect(self.checkProjectURL)
+        # layout.addWidget(self.check_button)
 
         self.form.setLayout(layout)
 
@@ -1677,7 +1654,6 @@ class SpecifyOmniverseURLPanel:
             public_project=False
         else:
             public_project=True
-            
 
         if hostname_new_project!='':
             if name_new_project!='':
@@ -1702,28 +1678,24 @@ class SpecifyOmniverseURLPanel:
                                 self.selected_asset_text.setText(' \u274c No STP asset selected.')
                                 self.selected_asset_usd_text.setText(' \u274c No corresponding USD asset selected.')
                     else:
-                        # print('[WARN] Failed to create new project!')
                         msgBox = QtGui.QMessageBox()
                         msgBox.setIcon(QtGui.QMessageBox.Warning)
                         msgBox.setText("Project names cannot contain the text 'asset' or 'assembly'.")
                         msgBox.exec_()
                         self.createNewProject()
                 else:
-                    # print('[WARN] Failed to create new project!')
                     msgBox = QtGui.QMessageBox()
                     msgBox.setIcon(QtGui.QMessageBox.Warning)
                     msgBox.setText("Project names must start with a letter.\nIt can contain letters, digits, or underscores, and cannot contain spaces.")
                     msgBox.exec_()
                     self.createNewProject()
             else:
-                # print('[WARN] Failed to create new project!')
                 msgBox = QtGui.QMessageBox()
                 msgBox.setIcon(QtGui.QMessageBox.Warning)
                 msgBox.setText("No project name specified!")
                 msgBox.exec_()
                 self.createNewProject()
         else:
-            # print('[WARN] Failed to create new project!')
             msgBox = QtGui.QMessageBox()
             msgBox.setIcon(QtGui.QMessageBox.Warning)
             msgBox.setText("No hostname specified!")
@@ -1738,13 +1710,10 @@ class SpecifyOmniverseURLPanel:
         dialog.setWindowTitle('Omniverse Connector for FreeCAD')
         dialog.setLabelText('Input existing project URL')
         dialog.show()
-
         dialog.findChild(QtGui.QLineEdit).hide()
         
-        # hostname_prompt = QtGui.QLabel("Nucleus host name:")
         self.input_box_project_url = QtGui.QLineEdit()
         projecturl_prompt_text = QtGui.QLabel("Enter a link with format omniverse://HOST_NAME/PROJECT_PATH")
-
 
         dialog.layout().insertWidget(1, self.input_box_project_url)
         dialog.layout().insertWidget(2, projecturl_prompt_text)
@@ -1758,10 +1727,8 @@ class SpecifyOmniverseURLPanel:
 
 
         dialog.exec_()
-        # print(host_name=='')
         projectURL = self.input_box_project_url.text()
 
-        # projectURL, ok = QtGui.QInputDialog.getText(self.form, 'Omniverse Connector for FreeCAD', 'Input existing project URL:')
         if projectURL!='':
             if '.usd' not in projectURL:
                 if no_restricted_strings_in_project_link(projectURL) ==True:
@@ -1784,7 +1751,7 @@ class SpecifyOmniverseURLPanel:
                 self.inputProjectURL()
 
     def checkProjectURL(self, inputProjectURL = None):
-        self.check_button.setText('\u9203 Validating link ...')
+        # self.check_button.setText('\u9203 Validating link ...')
         currentProjectURL = GetCurrentProjectLinkNoPrint()
         if inputProjectURL !=None:
             SaveProjectLinkAsTextFile(inputProjectURL)
@@ -1803,7 +1770,7 @@ class SpecifyOmniverseURLPanel:
                     delete_project_link()
                     ok = False
                 else:
-                    self.check_button.setText('Link validated. Revalidate?')
+                    # self.check_button.setText('Link validated. Revalidate?')
                     self.currentProjectURL_text.setText(' \u2705 Project directory: '+savedURL)
                     ok = True
 
@@ -1830,7 +1797,7 @@ class SpecifyOmniverseURLPanel:
                     delete_project_link()
                     ok = False
                 else:
-                    self.check_button.setText('Link validated. Revalidate?')
+                    # self.check_button.setText('Link validated. Revalidate?')
                     self.currentProjectURL_text.setText('\u2705 Project directory: '+savedURL)
                     ok = True
         else:
@@ -1874,14 +1841,21 @@ class SpecifyOmniverseURLPanel:
             if asset_name!='':
                 if text_follows_rules(asset_name)==True:
                     print('Creating new asset '+ asset_name+' on project '+ currentProjectURL)
-                    stdout, stderr, stplink, usdlink = CreateNewAssetOnNucleus(asset_name, use_url = True, projectURL=currentProjectURL, token=token)
-                    self.selected_asset_text.setText(' \u2705 Selected asset: '+stplink)
-                    self.selected_asset_usd_text.setText(' \u2705 Corresponding USD: '+ usdlink)
-                    SaveSTPLinkAsTextFile(stplink)
-                    SaveUSDLinkAsTextFile(usdlink)
+                    stdout, stderr, stplink, usdlink, error_text = CreateNewAssetOnNucleus(asset_name, use_url = True, projectURL=currentProjectURL, token=token)
+                    if error_text == None:
+                        self.selected_asset_text.setText(' \u2705 Selected asset: '+stplink.split('/')[-1])
+                        self.selected_asset_usd_text.setText(' \u2705 Corresponding USD: '+ usdlink.split('/')[-1])
+                        SaveSTPLinkAsTextFile(stplink)
+                        SaveUSDLinkAsTextFile(usdlink)
 
-                    GetAuthCheck(stplink,  filetype='stp')
-                    GetAuthCheck(usdlink,  filetype='usd')
+                        GetAuthCheck(stplink,  filetype='stp')
+                        GetAuthCheck(usdlink,  filetype='usd')
+                    else:
+                        msgBox = QtGui.QMessageBox()
+                        msgBox.setIcon(QtGui.QMessageBox.Critical)
+                        msgBox.setText(error_text)
+                        msgBox.exec_()
+                        self.dialogBoxCreateNewAsset()
                 else:
                     # print('[WARN] Failed to create new project!')
                     msgBox = QtGui.QMessageBox()
@@ -1945,7 +1919,7 @@ class SpecifyOmniverseURLPanel:
 
                         self.selected_asset_text.setText(' \u2705 Selected asset: '+item_short)
                         self.selected_asset_usd_text.setText(' \u2705 Corresponding USD: '+ usdlink_short)
-                    elif item==new_asset_string:
+                    elif item_short==new_asset_string:
                         self.dialogBoxCreateNewAsset()
             elif item_list==None and usd_list==None:
                 print('No assets found.')
@@ -1956,7 +1930,6 @@ class SpecifyOmniverseURLPanel:
                 ret = msg.exec_()
                 if ret==QtGui.QMessageBox.Ok:
                     self.dialogBoxCreateNewAsset()
-                #TODO: make new function in this class to create new asset (msg input dialog) and then call it.
         else:
             print('[WARN] No project link specified!')
             msgBox = QtGui.QMessageBox()
@@ -1964,84 +1937,10 @@ class SpecifyOmniverseURLPanel:
             msgBox.setText("No project link specified!")
             msgBox.exec_()            
             
-
-
     # Ok and Cancel buttons are created by default in FreeCAD Task Panels
     # What is done when we click on the ok button.
     def accept(self):
         FreeCADGui.Control.closeDialog() #close the dialog
-
-class SpecifyAssetItemPanel:
-    #DEPRECATED - TEST FUNCTION
-    def __init__(self,widget):
-        self.form = widget
-        layout = QtGui.QVBoxLayout()
-        self.URL_TextLabel = QtGui.QLabel("Select asset to edit from list:")
-        currentURL = GetCurrentUSDLinkNoPrint()
-        self.currentURL = QtGui.QLabel("No asset specified.")
-        if currentURL is not None:
-            self.currentURL = QtGui.QLabel("Current URL: "+currentURL)
-        # else:
-        #   self.currentURL = QtGui.QLabel("No Nucleus URL specified.")
-        # The layout will be horizontal
-        # Spin Box that takes doubles
-        self.URL_Text = QtGui.QLineEdit()
-        self.browse_button = QtGui.QPushButton("Select available assets")
-        self.browse_button.clicked.connect(self.getListItem)
-
-        # Default value
-        # self.URL_Text.setPlaceholderText('omniverse://hostname/path/to/your.stp')
-        # suffix to indicate the units
-        layout.addWidget(self.URL_TextLabel)
-        layout.addWidget(self.currentURL)
-        layout.addWidget(self.browse_button)
-        layout.addWidget(self.URL_Text)
-        
-        self.form.setLayout(layout)
-
-    def getListItem(self):
-        items = ("haha", "hihi", "hoho")
-        item, ok = QtGui.QInputDialog.getItem(self.form, "select input", "list of hahas", items, 0, False)
-        if ok and item:
-            self.URL_Text.setText('\u2705' +str(item))
-            self.selected_asset = item
-
-    # Ok and Cancel buttons are created by default in FreeCAD Task Panels
-    # What is done when we click on the ok button.
-    def accept(self):
-        print(self.selected_asset)
-        FreeCADGui.Control.closeDialog() #close the dialog
-
-# GUI command that links the Python script
-class _GetAssetCmd:
-    """Command to create a panel where user specifies URL of nucleus file
-    """
-
-    def Activated(self):
-        # what is done when the command is clicked
-        # creates a panel with a dialog
-        baseWidget = QtGui.QWidget()
-        panel = SpecifyAssetItemPanel(baseWidget)
-        # having a panel with a widget in self.form and the accept and 
-        # reject functions (if needed), we can open it:
-        FreeCADGui.Control.showDialog(panel)
-
-    def GetResources(self):
-        # icon and command information
-        MenuText = QtCore.QT_TRANSLATE_NOOP(
-            'testing item',
-            'test item')
-        ToolTip = QtCore.QT_TRANSLATE_NOOP(
-            'test item',
-            'test item')
-        return {
-            'Pixmap': __dir__ + '/icons/ovConnect_url.svg',
-            'MenuText': MenuText,
-            'ToolTip': ToolTip}
-
-    def IsActive(self):
-        # The command will be active if there is an active document
-        return not FreeCAD.ActiveDocument is None
 
 # GUI command that links the Python script
 class _GetURLPanel:
@@ -2052,7 +1951,7 @@ class _GetURLPanel:
         # what is done when the command is clicked
         # creates a panel with a dialog
         baseWidget = QtGui.QWidget()
-        panel = SpecifyOmniverseURLPanel(baseWidget)
+        panel = OmniConnectionSettingsPanel(baseWidget)
         # having a panel with a widget in self.form and the accept and 
         # reject functions (if needed), we can open it:
         FreeCADGui.Control.showDialog(panel)
@@ -2075,7 +1974,7 @@ class _GetURLPanel:
         return not FreeCAD.ActiveDocument is None
 
 class _GetAssemblyPanel:
-    """Command to create a panel where user specifies URL of nucleus file
+    """Command to create a panel for assembly
     """
 
     def Activated(self):
@@ -2103,7 +2002,6 @@ class _GetAssemblyPanel:
     def IsActive(self):
         # The command will be active if there is an active document
         is_activeDocumentExists = not FreeCAD.ActiveDocument is None
-        # is_activeProjectLinkExists = FreeCAD.OV_link_project !=None
 
         project_permission = GetCurrentProjectPermissions()
         projectURL = GetCurrentProjectLinkNoPrint()
@@ -2114,7 +2012,6 @@ class _GetAssemblyPanel:
         is_checksValid = is_activeDocumentExists == True and is_projectPermissionOK==True and is_projectURLExists==True
 
         return is_checksValid
-
 
 FreeCADGui.addCommand('OVconnect_URLPanel', _GetURLPanel())
 FreeCADGui.addCommand('OVconnect_push_to_nucleus', _UploadCmd())

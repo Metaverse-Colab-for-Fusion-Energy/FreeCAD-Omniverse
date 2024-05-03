@@ -1044,6 +1044,7 @@ if __name__ == "__main__":
     parser.add_argument("--pull", action="store_true", default=False)
     parser.add_argument("--push", action="store_true", default=False)
     parser.add_argument("--auth", action="store_true", default=False)
+    parser.add_argument("--auth_project", action="store_true", default=False)
     parser.add_argument("--test", action="store_true", default=False)
     parser.add_argument("--move_assembly", action="store_true", default=False)
     parser.add_argument("--push_non_usd", action="store_true", default=False)
@@ -1079,6 +1080,7 @@ if __name__ == "__main__":
     insert_validation_failure = args.fail
     localSTLPath = args.local_directory
     auth_op = args.auth
+    auth_project_op = args.auth_project
     pull_op = args.pull
     push_op = args.push
     test_op = args.test
@@ -1117,9 +1119,8 @@ if __name__ == "__main__":
         LOGGER.info(f"Connecting to "+existing_stage)
         print("Connecting to "+existing_stage)
         username = logConnectedUsername(existing_stage, output_log=True)
-        # print(serverInfo.authToken)
         if not username:
-            LOGGER.error(f"Cannot access USD file: {existing_stage}, authentication failed")
+            LOGGER.error(f"Cannot access file: {existing_stage}, authentication failed")
             print("[ERROR] NO_AUTH: Cannot authenticate with "+existing_stage)
             sys.exit("[ERROR] NO_AUTH: Cannot authenticate with "+existing_stage)
         acls = omni.client.get_acls(existing_stage)
@@ -1127,10 +1128,8 @@ if __name__ == "__main__":
         acl_dict = list(acls[1])
         does_usd_exist = not str(omni.client.stat(existing_stage)[0]) == 'Result.ERROR_NOT_FOUND'
         if does_usd_exist == False:
-            print('[ERROR] NOT_FOUND: Provided USD link at: \n' +existing_stage+ '\n Cannot be found! Double check link or ensure nucleus server is added to portal.')
-            sys.exit('[ERROR] NOT_FOUND: Provided USD link at: \n' +existing_stage+ '\n Cannot be found! Double check link or ensure nucleus server is added to portal.')
-        # is 'Result.ERROR_NOT_FOUND'
-        # print(acl_dict)
+            print('[ERROR] NOT_FOUND: Provided file link at: \n' +existing_stage+ '\n Cannot be found! Double check link or ensure nucleus server is added to portal.')
+            sys.exit('[ERROR] NOT_FOUND: Provided file link at: \n' +existing_stage+ '\n Cannot be found! Double check link or ensure nucleus server is added to portal.')
         access = 0
         for entries in acl_dict:
             if entries.name == username:
@@ -1139,9 +1138,37 @@ if __name__ == "__main__":
                 print(stringentry)
                 access+=1
         if access!=1:
-            print('[ERROR] NO_PERMISSION: Cannot access USD file: '+ existing_stage)
+            print('[ERROR] NO_PERMISSION: Cannot access file: '+ existing_stage)
             print('[ERROR] You do not have permissions to access this file! Contact your Nucleus administrator.')
-            print('Try logging in under a different username: log out through the nucleus. SIGNOUT BUTTON IS WIP')
+            print('Try logging in under a different username: log out through the nucleus.')
+
+    if existing_stage and auth_project_op==True:
+        LOGGER.info(f"Connecting to "+existing_stage)
+        print("Connecting to "+existing_stage)
+        username = logConnectedUsername(existing_stage, output_log=True)
+        if not username:
+            LOGGER.error(f"Cannot access project directory: {existing_stage}, authentication failed")
+            print("[ERROR] NO_AUTH: Cannot authenticate with "+existing_stage)
+            sys.exit("[ERROR] NO_AUTH: Cannot authenticate with "+existing_stage)
+        acls = omni.client.get_acls(existing_stage)
+        result = acls[0]
+        acl_dict = list(acls[1])
+        does_usd_exist = not str(omni.client.stat(existing_stage)[0]) == 'Result.ERROR_NOT_FOUND'
+        if does_usd_exist == False:
+            print('[ERROR] NOT_FOUND: Provided project directory link at: \n' +existing_stage+ '\n Cannot be found! Double check link or ensure nucleus server is added to portal.')
+            sys.exit('[ERROR] NOT_FOUND: Provided project directory link at: \n' +existing_stage+ '\n Cannot be found! Double check link or ensure nucleus server is added to portal.')
+        access = 0
+        for entries in acl_dict:
+            if entries.name == username:
+                stringentry = str(entries)
+                print('You have the following permissions to access this file:')
+                print(stringentry)
+                access+=1
+        if access!=1:
+            print('[ERROR] NO_PERMISSION: Cannot access project directory file: '+ existing_stage)
+            print('[ERROR] You do not have permissions to access this file! Contact your Nucleus administrator.')
+            print('Try logging in under a different username: log out through the nucleus.')
+
     # if existing_stage and logout_op==True:
     #   LOGGER.info(f"Logging out of "+existing_stage)
     #   print(dir(omni.client.ConnectionStatus))
@@ -1155,6 +1182,7 @@ if __name__ == "__main__":
         # print('readable file?', omni.client.ItemFlags.READABLE_FILE==True)
         # print('writeable file?', omni.client.ItemFlags.WRITEABLE_FILE==True)
         # print(omni.client.AccessFlags.READ==True)
+
 ### PULL FUNCTION - DEPRECATED IN V2
     elif existing_stage and pull_op==True:
         geom_mesh_prims, geom_mesh_paths = findGeomMesh(existing_stage)
@@ -1197,6 +1225,7 @@ if __name__ == "__main__":
         save_stage(existing_stage, comment=checkpoint_descriptor)
         print(checkpoint_descriptor)
 
+### FUNCTION TO CREATE NEW USD
     elif nucleus_url and create_new_usd==True:
         nucleus_url = createOmniverseModel(nucleus_url, live_edit=False)
         prim_name = 'testMesh'
@@ -1251,8 +1280,8 @@ if __name__ == "__main__":
             for usd_link in list_of_usd_urls:
                 usd_file_txt.write(usd_link + '\n')
 
+### FUNC TO CREATE NEW PROJECT
     elif create_new_project ==True and project_name and host_name:
-        #Test make new project
         base_url = new_url = omni.client.make_url(scheme = 'omniverse', host = host_name)
         app_name = 'FreeCAD'
         username = None
@@ -1267,6 +1296,7 @@ if __name__ == "__main__":
         if result != 'OK':
             print('ERROR: Folder creation '+str(result))
 
+### FUNC TO CREATE NEW ASSET
     elif create_new_asset ==True and asset_name:
         if host_name and project_name:
             print('Creating new asset at host: '+ host_name+' project name: '+ project_name)
@@ -1284,9 +1314,7 @@ if __name__ == "__main__":
             asset_path_url = nucleus_url +'/assets/'+str(asset_name)
             asset_path_url_item = omni.client.break_url(url = asset_path_url)
             asset_path = str(asset_path_url_item.path)
-            # print(new_url_item.path)
-
-        # print(new_url)
+            
         result = createEmptyFolder(asset_path_url)
         if result != 'OK':
             print('ERROR: Asset with this name already exists! '+str(result))
