@@ -12,6 +12,8 @@ rd ".\temp\.git\" /q /s
 
 robocopy .\temp .\omniConnect /e /NFL /NDL /NJH /NJS 
 
+robocopy .\omniConnect\source\PyHelloWorld\omni .\omniConnect\source\pyOmniFreeCAD\omni /e /NFL /NDL /NJH /NJS 
+
 echo --- Cleaning Connect Sample dependency directory...
 
 rd ".\temp\" /s /q
