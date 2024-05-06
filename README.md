@@ -22,6 +22,6 @@ This software makes CAD geometry created on FreeCAD available on NVIDIA Omnivers
 
 ## TODO
 - delete useless pyfiles
-- put documentation here (there is a howto somewhere...)
+- put documentation here (there is a howto somewhere...) - A draft documentation docx has just been added but this needs to be fixed to match the latest update
 - (maybe) restrict installation file
 - test fresh install again
