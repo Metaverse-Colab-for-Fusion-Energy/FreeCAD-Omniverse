@@ -1661,12 +1661,20 @@ class OmniConnectionSettingsPanel:
                     if no_restricted_strings_in_project_link(name_new_project) == True:
                         ok, stdout, stderr = CreateNewProjectOnNucleus(host_name = hostname_new_project, project_name = name_new_project, make_public = public_project)
                         if ok==False:
-                            print('[WARN] Failed to create new project!')
-                            [print('OmniClient:'+line) for line in stdout]
-                            print(stderr)
+                            print('[ERROR] Failed to create new project!')
+                            error_warning_text = None
+                            for line in stdout:
+                                if 'ERROR' in line:
+                                    error_warning_text = line
+                                    print(line)
+                                else:
+                                    print('OmniClient:'+line)
+                            if error_warning_text == None:
+                                error_warning_text = 'Failed to create new project!'
+
                             msgBox = QtGui.QMessageBox()
                             msgBox.setIcon(QtGui.QMessageBox.Critical)
-                            msgBox.setText("Failed to create new project!")
+                            msgBox.setText(error_warning_text)
                             msgBox.exec_()
                         elif ok==True:
                             stdout = [line.strip() for line in stdout]
@@ -1766,7 +1774,7 @@ class OmniConnectionSettingsPanel:
                     msgBox.setIcon(QtGui.QMessageBox.Critical)
                     msgBox.setText("[ERROR] Failed to authenticate with nucleus at "+savedURL)
                     msgBox.exec_()
-                    self.currentProjectURL_text.setText('No project Nucleus URL specified.')
+                    self.currentProjectURL_text.setText('\u274c No project Nucleus URL specified.')
                     delete_project_link()
                     ok = False
                 else:
@@ -1837,7 +1845,6 @@ class OmniConnectionSettingsPanel:
 
             token = str(RandomTokenGenerator())
 
-        
             if asset_name!='':
                 if text_follows_rules(asset_name)==True:
                     print('Creating new asset '+ asset_name+' on project '+ currentProjectURL)
@@ -1891,12 +1898,11 @@ class OmniConnectionSettingsPanel:
                 usd_list = [link_entry.strip() for link_entry in usd_list]
                 item_list = [link_entry.strip() for link_entry in item_list]
                 item_list_short = [item.split('/')[-1] for item in item_list]
-                #TODO: change so that the getItem doesnt show the entire URL
                 
                 new_asset_string = 'Create new asset...'
                 item_list_short.append(new_asset_string)
                 if len(item_list_short)>2:
-                    dialog_txt = "Found "+ str(len(item_list)-1) +' geometry assets. Select one or create new asset:'
+                    dialog_txt = "Found "+ str(len(item_list_short)-1) +' geometry assets. Select one or create new asset:'
                 else:
                     dialog_txt = "Found " +'1 geometry asset. Select it or create new asset:'
                 item_short, ok = QtGui.QInputDialog.getItem(self.form, "Omniverse Connector for FreeCAD", dialog_txt, item_list_short, 0, False)

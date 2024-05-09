@@ -1294,7 +1294,7 @@ if __name__ == "__main__":
         print(new_url)
         result = createEmptyFolder(new_url)
         if result != 'OK':
-            print('ERROR: Folder creation '+str(result))
+            print('ERROR: '+ str(result)+' A project with that name already exists! Connect to the existing project or use a different project name.')
 
 ### FUNC TO CREATE NEW ASSET
     elif create_new_asset ==True and asset_name:
