@@ -1343,7 +1343,7 @@ class OmniverseAssemblyPanel:
                 selected_assembly_usd_link = [usdlink for usdlink in self.existing_assembly_usd_links if assembly_name in usdlink][0]
                 print(selected_assembly_usd_link)
                 FreeCAD.assembly_usd_link = selected_assembly_usd_link
-                self.current_assembly_URL_text.setText(' \u2705 Current assembly: '+FreeCAD.assembly_usd_link)
+                self.current_assembly_URL_text.setText(' \u2705 Current assembly: '+FreeCAD.assembly_usd_link.split('/')[-1])
                 self.status_header_text.setText(' Status: \u2705 Ready')
                 
                 start_fetch_xform = time.time()
@@ -1435,14 +1435,26 @@ class OmniverseAssemblyPanel:
                             self.proc.start("powershell", [cmd])
                     else:
                         self.live_mode_button.setChecked(False)
-                        print('No session selected!')
+                        print('[WARN] No live sessions selected!')
+                        msgBox = QtGui.QMessageBox()
+                        msgBox.setIcon(QtGui.QMessageBox.Warning)
+                        msgBox.setText("No live sessions selected!")
+                        msgBox.exec_()
 
                 elif success==False:
                     self.live_mode_button.setChecked(False)
-                    print('No sessions found!')
+                    print('[WARN] No live sessions found!')
+                    msgBox = QtGui.QMessageBox()
+                    msgBox.setIcon(QtGui.QMessageBox.Warning)
+                    msgBox.setText("No live sessions found!")
+                    msgBox.exec_()
             else:
                 self.live_mode_button.setChecked(False)
-                print('No assembly link!')
+                print('[WARN] No assembly link specified!')
+                msgBox = QtGui.QMessageBox()
+                msgBox.setIcon(QtGui.QMessageBox.Warning)
+                msgBox.setText("No assembly link specified!")
+                msgBox.exec_()
         else:
             self.live_mode_button.setText('(EXPERIMENTAL) Live assembly mode')
             print('Exiting live session process...')
