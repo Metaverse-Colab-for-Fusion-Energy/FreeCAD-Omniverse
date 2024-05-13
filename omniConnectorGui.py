@@ -1625,6 +1625,9 @@ class OmniConnectionSettingsPanel:
         self.browse_button = QtGui.QPushButton("Browse project assets")
         self.browse_button.clicked.connect(self.getListItem)
 
+        self.project_disconnect_button = QtGui.QPushButton("Disconnect from project")
+        self.project_disconnect_button.clicked.connect(self.disconnect_from_project)
+
         layout.addWidget(self.panel_name_text)
         layout.addWidget(self.open_existing_project_button)
         layout.addWidget(self.create_new_project_button)        
@@ -1633,6 +1636,7 @@ class OmniConnectionSettingsPanel:
         layout.addWidget(self.currentProjectURL_text)
         layout.addWidget(self.selected_asset_text)
         layout.addWidget(self.selected_asset_usd_text)
+        layout.addWidget(self.project_disconnect_button)
 
         # Deprecated refresh connection/check connection fuction
         # self.check_button = QtGui.QPushButton("Validate link")
@@ -1640,6 +1644,32 @@ class OmniConnectionSettingsPanel:
         # layout.addWidget(self.check_button)
 
         self.form.setLayout(layout)
+
+    def disconnect_from_project(self):
+        if 'is_connected_to_nucleus_project' not in dir(FreeCAD):
+            FreeCAD.is_connected_to_nucleus_project = False
+            msgBox = QtGui.QMessageBox()
+            msgBox.setIcon(QtGui.QMessageBox.Warning)
+            msgBox.setText("No Nucleus project currently connected!")
+            msgBox.exec_()
+        if FreeCAD.is_connected_to_nucleus_project == False:
+            msgBox = QtGui.QMessageBox()
+            msgBox.setIcon(QtGui.QMessageBox.Warning)
+            msgBox.setText("No Nucleus project currently connected!")
+            msgBox.exec_()
+        else:
+            current_project_link = GetCurrentProjectLinkNoPrint()
+            last_project_link = GetLastProjectLinkNoPrint()
+            ClearLocalDirectory()
+            FreeCAD.assembly_usd_link=None
+
+            if current_project_link != None:
+                SaveLastProjectLinkAsTextFile(current_project_link)
+            elif last_project_link!=None:
+                SaveLastProjectLinkAsTextFile(last_project_link)
+            self.currentProjectURL_text.setText('\u274c No project Nucleus URL specified.')
+            FreeCAD.is_connected_to_nucleus_project = False
+
 
     def createNewProject(self):
         dialog = QtGui.QInputDialog(self.form)
@@ -1796,10 +1826,12 @@ class OmniConnectionSettingsPanel:
                     self.currentProjectURL_text.setText('\u274c No project Nucleus URL specified.')
                     delete_project_link()
                     ok = False
+                    FreeCAD.is_connected_to_nucleus_project = False
                 else:
                     # self.check_button.setText('Link validated. Revalidate?')
                     self.currentProjectURL_text.setText(' \u2705 Project directory: '+savedURL)
                     ok = True
+                    FreeCAD.is_connected_to_nucleus_project = True
 
         elif currentProjectURL is not None and inputProjectURL==None:
             SaveProjectLinkAsTextFile(currentProjectURL)
@@ -1823,10 +1855,12 @@ class OmniConnectionSettingsPanel:
                     self.currentProjectURL_text.setText(' \u274c No Project Nucleus URL specified.')
                     delete_project_link()
                     ok = False
+                    FreeCAD.is_connected_to_nucleus_project = False
                 else:
                     # self.check_button.setText('Link validated. Revalidate?')
                     self.currentProjectURL_text.setText('\u2705 Project directory: '+savedURL)
                     ok = True
+                    FreeCAD.is_connected_to_nucleus_project = True
         else:
             print('[WARN] No project link specified!')
             msgBox = QtGui.QMessageBox()
@@ -2041,5 +2075,5 @@ class _GetAssemblyPanel:
 FreeCADGui.addCommand('OVconnect_URLPanel', _GetURLPanel())
 FreeCADGui.addCommand('OVconnect_push_to_nucleus', _UploadCmd())
 FreeCADGui.addCommand('OVconnect_pull_from_nucleus', _DownloadCmd())
-FreeCADGui.addCommand('OVconnect_clear_junk_files', _ClearJunkCmd())
+# FreeCADGui.addCommand('OVconnect_clear_junk_files', _ClearJunkCmd())
 FreeCADGui.addCommand('OVconnect_assembly_tools', _GetAssemblyPanel())

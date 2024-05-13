@@ -201,7 +201,7 @@ class OmniverseConnector (Workbench):
         # python file where the commands are:
         import omniConnectorGui
         # list of commands, only one (it is in the imported omniConnectorGui):
-        cmdlist = [ "OVconnect_pull_from_nucleus", "OVconnect_push_to_nucleus", "OVconnect_URLPanel", "OVconnect_assembly_tools", "OVconnect_clear_junk_files"]
+        cmdlist = [ "OVconnect_pull_from_nucleus", "OVconnect_push_to_nucleus", "OVconnect_URLPanel", "OVconnect_assembly_tools"]
         self.appendToolbar(
             str(QtCore.QT_TRANSLATE_NOOP("OmniverseConnector", "OmniverseConnector")), cmdlist)
         self.appendMenu(
@@ -213,6 +213,7 @@ class OmniverseConnector (Workbench):
         last_project_link = omniConnectorGui.GetLastProjectLinkNoPrint()
         omniConnectorGui.ClearLocalDirectory()
         FreeCAD.assembly_usd_link=None
+        FreeCAD.is_connected_to_nucleus_project = False
 
         if current_project_link != None:
             omniConnectorGui.SaveLastProjectLinkAsTextFile(current_project_link)
