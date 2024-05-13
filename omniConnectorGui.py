@@ -1668,6 +1668,8 @@ class OmniConnectionSettingsPanel:
             elif last_project_link!=None:
                 SaveLastProjectLinkAsTextFile(last_project_link)
             self.currentProjectURL_text.setText('\u274c No project Nucleus URL specified.')
+            self.selected_asset_text.setText(' \u274c No STP asset selected.')
+            self.selected_asset_usd_text.setText(' \u274c No corresponding USD asset selected.')
             FreeCAD.is_connected_to_nucleus_project = False
 
 
