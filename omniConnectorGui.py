@@ -452,7 +452,7 @@ def UploadUSDToNucleus(usdlink, selected_object, token, existing_usd = True):
     return stdout, stderr
 
 
-def UploadSTPToNucleus(stplink, selected_object, token, existing_stp = True):
+def UploadSTPToNucleus(stplink, selected_object, token, existing_stp = True, custom_checkpoint = None):
     if existing_stp ==True:
         permission = GetCurrentSTPPermissions()
         if permission =='NO_ACCESS':
@@ -481,6 +481,9 @@ def UploadSTPToNucleus(stplink, selected_object, token, existing_stp = True):
             # selected_object.Label2 = str([stplink, token])
             # Parsing commands for the batchfile
             cmd = batchfilepath + ' --nucleus_url' +' '+ stplink + ' --local_non_usd_filename '+ local_STP_filepath.replace(" ","` ") +' --push_non_usd' +" --token "+ token
+            if custom_checkpoint != None:
+                custom_checkpoint = '\"'+ custom_checkpoint + '\"'
+                cmd = cmd + ' --custom_checkpoint ' + str(custom_checkpoint)
             print(cmd)
             # Now running command to push to Nucleus
             p = subprocess.Popen(['powershell', cmd], shell=True, stdout = subprocess.PIPE, stderr = subprocess.PIPE)
@@ -544,7 +547,7 @@ def check_file_isempty(file_path):
         print(f"File not found: {file_path}")
         return False
 
-def DownloadSTPFromNucleus(stplink, token):
+def DownloadSTPFromNucleus(stplink, token, custom_checkpoint = None):
     # Downloads a step file hosted on nucleus
     imported_object = None
     permission = GetCurrentSTPPermissions()
@@ -576,6 +579,9 @@ def DownloadSTPFromNucleus(stplink, token):
 
         # Parsing commands for the batchfile
         cmd = batchfilepath  + ' --nucleus_url '+ stplink + ' --pull_non_usd ' + " --local_non_usd_filename "+ local_STP_filepath.replace(" ","` ") + " --token " + token
+        if custom_checkpoint != None:
+            custom_checkpoint = '\"'+ custom_checkpoint + '\"'
+            cmd = cmd + ' --custom_checkpoint ' + str(custom_checkpoint)
         print(cmd)
         p = subprocess.Popen(['powershell', cmd], shell=True, stdout = subprocess.PIPE, stderr = subprocess.PIPE)
         stdout, stderr = p.communicate()
@@ -791,7 +797,6 @@ def parse_list_into_set_srt_command_arg(input_list):
             str_item = str(item)
             if item < 0:
                 str_item = 'min'+ str_item[1:]
-                print(str_item)
             fixed_list.append(str_item)
 
     input_list_str = str(fixed_list)
@@ -818,12 +823,12 @@ def get_full_link_from_short(selected_item, first_list, second_list):
 ### FRONTEND FUNCTIONS - MAPPING BUTTONS WIDGETS ETC TO REAL FUNCTIONS
 
 
-def _DownloadCmdWrapper(stplink, usdlink, token):
+def _DownloadCmdWrapper(stplink, usdlink, token, custom_checkpoint=None):
 
     if stplink is not None:
         GetAuthCheck(stplink,  filetype='stp')
         print('Pulling from '+stplink)
-        ok, imported_object, output, error, fc_err = DownloadSTPFromNucleus(stplink, token = token)
+        ok, imported_object, output, error, fc_err = DownloadSTPFromNucleus(stplink, token = token, custom_checkpoint = custom_checkpoint)
         output = output.split('\r\n')
         for line in output:
             print('OmniClient:', line)
@@ -1348,7 +1353,7 @@ class OmniverseAssemblyPanel:
                 
                 start_fetch_xform = time.time()
                 stdout, stderr, prim_data =  GetPrimReferenceXForms(selected_assembly_usd_link)
-                print('FETCH COMPONENT XFORM:', time.time()-start_fetch_xform, 's.')
+                # print('FETCH COMPONENT XFORM:', time.time()-start_fetch_xform, 's.')
                 print(prim_data)
                 token = str(RandomTokenGenerator())
 
@@ -1357,10 +1362,12 @@ class OmniverseAssemblyPanel:
                     usdlink = dict_entry['ref-path']
                     start_fetch_geom = time.time()
                     rotation = dict_entry['rot-xyz'][::-1]
-                    imported_obj = _DownloadCmdWrapper(stplink, usdlink, token)
+                    custom_checkpoint_message = 'Imported assembly into FreeCAD as part of '+ str(assembly_name)
+                    imported_obj = _DownloadCmdWrapper(stplink, usdlink, token, custom_checkpoint = custom_checkpoint_message)
                     imported_obj.Placement.Base = FreeCAD.Vector(dict_entry['transform'])
                     imported_obj.Placement.Rotation = FreeCAD.Rotation(*rotation)
-                    print('FETCH SINGLE COMPONENT:', time.time()-start_fetch_geom, 's.')
+                    print('[INFO] Moving and rotating ', str(imported_obj.Label), 'to ', dict_entry['transform'], rotation)
+                    # print('FETCH SINGLE COMPONENT:', time.time()-start_fetch_geom, 's.')
         else:
             print('[WARN] No existing assemblies found for this project!')
             msgBox = QtGui.QMessageBox()

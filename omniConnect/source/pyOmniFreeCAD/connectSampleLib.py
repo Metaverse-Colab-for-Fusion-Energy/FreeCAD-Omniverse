@@ -691,7 +691,7 @@ def set_xform_srt_from_reference_asset_path(assembly_stage_url, list_dict_prim_d
                     print(prim_reference, child_node.GetAttribute('xformOp:rotateXYZ').Get(), child_node.GetAttribute('xformOp:translate').Get())
 
 
-    checkpoint_descriptor = 'Moved items.'
+    checkpoint_descriptor = 'Moved assembly geometry using FreeCAD.'
     save_stage(assembly_stage_url, comment=checkpoint_descriptor)
     return None
 
@@ -1068,6 +1068,7 @@ if __name__ == "__main__":
     parser.add_argument("--set_transform", nargs ='+', action="store")
     parser.add_argument("--set_rot_xyz", nargs ='+', action="store")
     parser.add_argument("--make_public", action="store_true", default=False)
+    parser.add_argument("--custom_checkpoint", nargs ='+', action="store")
 
     args = parser.parse_args()
 
@@ -1101,8 +1102,10 @@ if __name__ == "__main__":
     asset_stp_links = args.asset_stp_links
     set_transform = args.set_transform
     set_rot_xyz = args.set_rot_xyz
-    move_assembly = args.move_assembly
+    set_rot_xyz = args.set_rot_xyz
+    custom_checkpoint = args.custom_checkpoint
     make_public = args.make_public
+    move_assembly = args.move_assembly
 
     # print(args)
 
@@ -1448,11 +1451,13 @@ if __name__ == "__main__":
             data = bytearray(bin_data)
         except FileNotFoundError:
             print('[ERROR] FileNotFoundError. Check file name.')
-
-        if token is not None:
-            checkpoint_descriptor = "Push from FreeCAD - token "+ str(token)
+        if custom_checkpoint is not None:
+            checkpoint_descriptor = custom_checkpoint[0] + ' - token ' + str(token)
         else:
-            checkpoint_descriptor = "Push from FreeCAD"
+            if token is not None:
+                checkpoint_descriptor = "Push from FreeCAD - token "+ str(token)
+            else:
+                checkpoint_descriptor = "Push from FreeCAD"
 
         upload_result = omni.client.write_file(url=nucleus_url, 
             content=data, 
@@ -1468,10 +1473,13 @@ if __name__ == "__main__":
         read_output_result = read_output_from_nucleus[0]
         print('Read from Nucleus: '+ str(read_output_result))
         read_output_bin = bytearray(read_output_content)
-        if token is not None:
-            checkpoint_descriptor = "Pull to FreeCAD - token "+ str(token)
+        if custom_checkpoint is not None:
+            checkpoint_descriptor = custom_checkpoint[0] + ' - token ' + str(token)
         else:
-            checkpoint_descriptor = "Pull to FreeCAD"
+            if token is not None:
+                checkpoint_descriptor = "Pull to FreeCAD - token "+ str(token)
+            else:
+                checkpoint_descriptor = "Pull to FreeCAD"
 
         try:
             local_bin_f.write(read_output_bin)
