@@ -340,7 +340,7 @@ def createEmptyMeshPrim(stageUrl, prim_name):
     save_stage(stageUrl, comment="Created empty mesh prim.")
     return meshPrim
 
-def createXformWithReference(stageUrl, prim_name, reference_path):
+def createXformWithReference(stageUrl, prim_name, reference_path, token=None):
     global g_stage
     default_prim_path = g_stage.GetDefaultPrim().GetPath().pathString
 
@@ -348,7 +348,10 @@ def createXformWithReference(stageUrl, prim_name, reference_path):
     primPath = default_prim_path + "/" + Tf.MakeValidIdentifier(str(prim_name))
     XformPrim = UsdGeom.Xform.Define(g_stage, primPath)
     XformPrim.GetPrim().GetReferences().AddReference(str(reference_path))
-    save_stage(stageUrl, comment = 'Created Xform with reference to '+str(reference_path))
+    if token==None:
+        save_stage(stageUrl, comment = 'NO_TOKEN - Added assembly object with reference to '+('/').join(reference_path.split('/')[-2:]))
+    else:
+        save_stage(stageUrl, comment = str(token) + ' - Added assembly object with reference to '+('/').join(reference_path.split('/')[-2:]))
     return XformPrim
 
 
@@ -608,7 +611,7 @@ def resolve_relative_usd_path(this_path, relative_reference_path):
     return full_absolute_path
 
 
-def get_all_xform_reference_paths(stageUrl):
+def get_all_xform_reference_paths(stageUrl, token=None):
     global g_stage
 
     g_stage = Usd.Stage.Open(stageUrl)
@@ -653,9 +656,15 @@ def get_all_xform_reference_paths(stageUrl):
                     scale = tuple(scale)
 
                 print(prim_reference, ' | ', translate, ' | ', rot_xyz, ' | ', scale)
+    checkpoint_descriptor = ' - Sent Xform positions to FreeCAD'
+    if token==None:
+        token = 'NO_TOKEN'
+    checkpoint_descriptor = str(token) + checkpoint_descriptor
+
+    save_stage(stageUrl, comment=checkpoint_descriptor)
     return None
 
-def set_xform_srt_from_reference_asset_path(assembly_stage_url, list_dict_prim_data):
+def set_xform_srt_from_reference_asset_path(assembly_stage_url, list_dict_prim_data, token=None):
     global g_stage
     g_stage = Usd.Stage.Open(assembly_stage_url)
 
@@ -690,8 +699,10 @@ def set_xform_srt_from_reference_asset_path(assembly_stage_url, list_dict_prim_d
                     srt_action.do()
                     print(prim_reference, child_node.GetAttribute('xformOp:rotateXYZ').Get(), child_node.GetAttribute('xformOp:translate').Get())
 
-
-    checkpoint_descriptor = 'Moved assembly geometry using FreeCAD.'
+    if token == None:
+        checkpoint_descriptor = 'NO_TOKEN - Moved assembly geometry using FreeCAD.'
+    else:
+        checkpoint_descriptor = str(token) + ' - Moved assembly geometry using FreeCAD'
     save_stage(assembly_stage_url, comment=checkpoint_descriptor)
     return None
 
@@ -1069,6 +1080,8 @@ if __name__ == "__main__":
     parser.add_argument("--set_rot_xyz", nargs ='+', action="store")
     parser.add_argument("--make_public", action="store_true", default=False)
     parser.add_argument("--custom_checkpoint", nargs ='+', action="store")
+    parser.add_argument("--add_checkpoint_to_usd", action="store_true", default=False)
+    parser.add_argument("--add_checkpoint_to_non_usd", action="store_true", default=False)
 
     args = parser.parse_args()
 
@@ -1106,6 +1119,8 @@ if __name__ == "__main__":
     custom_checkpoint = args.custom_checkpoint
     make_public = args.make_public
     move_assembly = args.move_assembly
+    add_checkpoint_to_usd = args.add_checkpoint_to_usd
+    add_checkpoint_to_non_usd = args.add_checkpoint_to_non_usd
 
     # print(args)
 
@@ -1193,21 +1208,44 @@ if __name__ == "__main__":
             sys.exit("[ERROR] Unable to find mesh at " + existing_stage)
         geom_mesh_prims = geom_mesh_prims[0]
         geom_mesh_paths = geom_mesh_paths[0]
-        t = time.localtime()
-        current_time = time.strftime("%H:%M:%S", t)
-        starttime = time.time()
+
         if token is not None:
             local_fname = localSTLPath+'/'+str(token)+'download.stl'
-            checkpoint_descriptor = "["+current_time+"] Pull to FreeCAD - token "+ str(token)
+            checkpoint_descriptor = str(token) + " - Pull to FreeCAD"
         else:
             local_fname = localSTLPath+'/download.stl'
-            checkpoint_descriptor = "["+current_time+"] Pull to FreeCAD"
+            checkpoint_descriptor = "NO_TOKEN - Pull to FreeCAD"
         o3d_triangle_mesh = convertMeshPrimToO3dTriMesh(geom_mesh_prims)
         # o3d.visualization.draw_geometries([o3d_triangle_mesh])
         # print(local_fname)
         o3d.io.write_triangle_mesh(local_fname, o3d_triangle_mesh)
         save_stage(existing_stage, comment=checkpoint_descriptor)
         print(checkpoint_descriptor)
+
+    elif add_checkpoint_to_usd and nucleus_url and custom_checkpoint:
+        g_stage = Usd.Stage.Open(nucleus_url)
+        if token:
+            checkpoint_descriptor = str(token) + ' - ' + custom_checkpoint[0]
+            save_stage(nucleus_url, comment=checkpoint_descriptor)
+        else:
+            checkpoint_descriptor = 'NO_TOKEN - ' + custom_checkpoint[0]
+            save_stage(nucleus_url, comment=checkpoint_descriptor)
+
+    elif add_checkpoint_to_non_usd and nucleus_url and custom_checkpoint:
+        read_output_from_nucleus = omni.client.read_file(url=nucleus_url)
+        read_output_content = read_output_from_nucleus[2]
+        read_output_result = read_output_from_nucleus[0]
+
+        read_output_bin = bytearray(read_output_content)
+        if token is not None:
+            checkpoint_descriptor = str(token) + ' - ' + custom_checkpoint[0]
+        else:
+            checkpoint_descriptor = 'NO_TOKEN - ' + custom_checkpoint[0]
+
+        upload_result = omni.client.write_file(url=nucleus_url, 
+            content=read_output_bin, 
+            message=checkpoint_descriptor)
+
 ### PUSH FUNCTION
     elif existing_stage and push_op==True:
         geom_mesh_prims, geom_mesh_paths = findGeomMesh(existing_stage)
@@ -1218,10 +1256,10 @@ if __name__ == "__main__":
 
         if token is not None:
             local_fname = localSTLPath+'/'+str(token)+'upload.stl'
-            checkpoint_descriptor = "Push from FreeCAD - token "+ str(token)
+            checkpoint_descriptor = str(token) + " - Push from FreeCAD"
         else:
             local_fname = localSTLPath+'/upload.stl'
-            checkpoint_descriptor = "Push from FreeCAD"
+            checkpoint_descriptor = "NO_TOKEN - Push from FreeCAD"
         new_mesh = o3d.io.read_triangle_mesh(local_fname)
         o3dToUSDConverter = o3dSTLMesh(new_mesh)
         geom_mesh_prims = o3dToUSDConverter.convertToUSDGeomMesh(geom_mesh_prims, existing_stage)
@@ -1234,15 +1272,13 @@ if __name__ == "__main__":
         prim_name = 'testMesh'
         meshPrim = createEmptyMeshPrim(nucleus_url, prim_name)
 
-        t = time.localtime()
-        current_time = time.strftime("%H:%M:%S", t)
-        starttime = time.time()
+
         if token is not None:
             local_fname = localSTLPath+'/'+str(token)+'upload.stl'
-            checkpoint_descriptor = "["+current_time+"] Push from FreeCAD - token "+ str(token)
+            checkpoint_descriptor = str(token) + " - Created new asset on FreeCAD"
         else:
             local_fname = localSTLPath+'/upload.stl'
-            checkpoint_descriptor = "["+current_time+"] Push from FreeCAD"
+            checkpoint_descriptor = "NO_TOKEN - Created new asset on FreeCAD"
 
         new_mesh = o3d.io.read_triangle_mesh(local_fname)
         o3dToUSDConverter = o3dSTLMesh(new_mesh)
@@ -1341,10 +1377,10 @@ if __name__ == "__main__":
             starttime = time.time()
             if token is not None:
                 local_fname = localSTLPath+'/'+str(token)+'upload.stl'
-                checkpoint_descriptor = "["+current_time+"] New asset - token "+ str(token)
+                checkpoint_descriptor = str(token) + " - Created new asset on FreeCAD"
             else:
                 local_fname = localSTLPath+'/upload.stl'
-                checkpoint_descriptor = "["+current_time+"] New asset"
+                checkpoint_descriptor = "NO_TOKEN - Created new asset on FreeCAD"
 
             save_stage(full_usd_asset_url, comment=checkpoint_descriptor)
             print(checkpoint_descriptor)
@@ -1368,6 +1404,10 @@ if __name__ == "__main__":
         else:
             assembly_usd_url = assembly_folder_url+'/assembly.usda'
         assembly_usd_url = createOmniverseModel(assembly_usd_url, live_edit=False)
+        if token is not None:
+            save_stage(assembly_usd_url, comment = str(token) + ' - Created new assembly file.')
+        else:
+            save_stage(assembly_usd_url, comment = 'NO_TOKEN - Created new assembly file.')
 
         default_prim_path = g_stage.GetDefaultPrim().GetPath().pathString
 
@@ -1403,7 +1443,10 @@ if __name__ == "__main__":
                 usd_filename=splitURLGetUSDFileName(asset_usd_link)
                 prim_name = strip_suffixes(usd_filename)
                 prim_name_list.append(strip_suffixes(usd_filename))
-                XformPrim = createXformWithReference(assembly_usd_url, prim_name, asset_usd_link)
+                if token is not None:
+                    XformPrim = createXformWithReference(assembly_usd_url, prim_name, asset_usd_link, token = token)
+                else:
+                    XformPrim = createXformWithReference(assembly_usd_url, prim_name, asset_usd_link)
             # print(prim_name_list)
         print(assembly_usd_url)
     elif find_existing_assemblies==True and nucleus_url:
@@ -1429,8 +1472,10 @@ if __name__ == "__main__":
     elif get_prim_reference_xforms ==True and nucleus_url:
         #func to get location, attitude, and reference of items in a assembly USD
         assembly_url = nucleus_url
-        get_all_xform_reference_paths(assembly_url)
-
+        if token is not None:
+            get_all_xform_reference_paths(assembly_url, token = token)
+        else:
+            get_all_xform_reference_paths(assembly_url)
     elif move_assembly ==True and set_rot_xyz and set_transform and asset_usd_links:
         # func to set location and rotation for individual items in a given assembly USD
         # print(args)
@@ -1439,8 +1484,10 @@ if __name__ == "__main__":
         set_rot_xyz = parse_srt_list(set_rot_xyz)
         set_transform = parse_srt_list(set_transform)
         prim_data = parse_srt_and_ref_into_dict(set_transform, set_rot_xyz, asset_usd_links)
-
-        set_xform_srt_from_reference_asset_path(assembly_url, prim_data)
+        if token is not None:
+            set_xform_srt_from_reference_asset_path(assembly_url, prim_data, token = token)
+        else:
+            set_xform_srt_from_reference_asset_path(assembly_url, prim_data)
  
     elif nucleus_url and push_non_usd ==True and local_non_usd_filename:
         local_upload_file_path = local_non_usd_filename
@@ -1452,12 +1499,12 @@ if __name__ == "__main__":
         except FileNotFoundError:
             print('[ERROR] FileNotFoundError. Check file name.')
         if custom_checkpoint is not None:
-            checkpoint_descriptor = custom_checkpoint[0] + ' - token ' + str(token)
+            checkpoint_descriptor = str(token) + ' - ' + custom_checkpoint[0]
         else:
             if token is not None:
-                checkpoint_descriptor = "Push from FreeCAD - token "+ str(token)
+                checkpoint_descriptor = str(token) + " - Push from FreeCAD"
             else:
-                checkpoint_descriptor = "Push from FreeCAD"
+                checkpoint_descriptor = "NO_TOKEN - Push from FreeCAD"
 
         upload_result = omni.client.write_file(url=nucleus_url, 
             content=data, 
@@ -1474,12 +1521,12 @@ if __name__ == "__main__":
         print('Read from Nucleus: '+ str(read_output_result))
         read_output_bin = bytearray(read_output_content)
         if custom_checkpoint is not None:
-            checkpoint_descriptor = custom_checkpoint[0] + ' - token ' + str(token)
+            checkpoint_descriptor = str(token) + ' - ' + custom_checkpoint[0] 
         else:
             if token is not None:
-                checkpoint_descriptor = "Pull to FreeCAD - token "+ str(token)
+                checkpoint_descriptor = str(token) + " - Pull to FreeCAD"
             else:
-                checkpoint_descriptor = "Pull to FreeCAD"
+                checkpoint_descriptor = "NO_TOKEN - Pull to FreeCAD"
 
         try:
             local_bin_f.write(read_output_bin)

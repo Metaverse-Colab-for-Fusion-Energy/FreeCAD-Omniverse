@@ -628,7 +628,7 @@ def CreateNewProjectOnNucleus(host_name, project_name, make_public=False):
     return ok, stdout, stderr
 
 
-def CreateNewAssemblyOnNucleus(projectURL, assembly_name = None, assembly_items_usd_links=None, assembly_items_stp_links=None):
+def CreateNewAssemblyOnNucleus(projectURL, assembly_name = None, assembly_items_usd_links=None, assembly_items_stp_links=None, token=None):
     #a wrapper function for create new assembly
     batchfilepath = GetFetcherScriptsDirectory().replace(" ","` ")
     batchfilename = GetBatchFileName()
@@ -645,6 +645,8 @@ def CreateNewAssemblyOnNucleus(projectURL, assembly_name = None, assembly_items_
         cmd = batchfilepath + ' --nucleus_url '+ str(projectURL) + ' --create_new_assembly ' + ' --assembly_name ' + str(assembly_name) +' --asset_usd_links '+ str(str_assembly_items_usd) + ' --asset_stp_links '+ str(str_assembly_items_stp)
     else:
         cmd = batchfilepath + ' --nucleus_url '+ str(projectURL) + ' --create_new_assembly ' + ' --assembly_name ' + str(assembly_name)
+    if token is not None:
+        cmd = cmd + ' --token ' + str(token)
     print(cmd)
     p = subprocess.Popen(['powershell', cmd], shell=True, stdout = subprocess.PIPE, stderr = subprocess.PIPE)
     stdout, stderr = p.communicate()
@@ -659,6 +661,35 @@ def CreateNewAssemblyOnNucleus(projectURL, assembly_name = None, assembly_items_
             assembly_usd_link = line
 
     return stdout, stderr, assembly_usd_link
+
+def AddCheckpointToUSDOnNucleus(usd_url, custom_checkpoint, token=None):
+    batchfilepath = GetFetcherScriptsDirectory().replace(" ","` ")
+    batchfilename = GetBatchFileName()
+    batchfilepath = batchfilepath+batchfilename
+    custom_checkpoint = '\"'+ custom_checkpoint + '\"'
+
+    cmd = batchfilepath + ' --nucleus_url ' + str(usd_url) + ' --add_checkpoint_to_usd '
+    if token!=None:
+        cmd = cmd + ' --token ' + str(token) + ' --custom_checkpoint ' + custom_checkpoint
+    else:
+        cmd  = cmd + ' --custom_checkpoint ' + custom_checkpoint
+    print(cmd)
+    p = subprocess.Popen(['powershell', cmd], shell=True, stdout = subprocess.PIPE, stderr = subprocess.PIPE)
+    stdout, stderr = p.communicate()
+
+def AddCheckpointToNonUSDOnNucleus(usd_url, custom_checkpoint, token=None):
+    batchfilepath = GetFetcherScriptsDirectory().replace(" ","` ")
+    batchfilename = GetBatchFileName()
+    batchfilepath = batchfilepath+batchfilename
+    custom_checkpoint = '\"'+ custom_checkpoint + '\"'
+    cmd = batchfilepath + ' --nucleus_url ' + str(usd_url) + ' --add_checkpoint_to_non_usd ' 
+    if token!=None:
+        cmd = cmd + ' --token ' + str(token) + ' --custom_checkpoint ' + custom_checkpoint
+    else:
+        cmd  = cmd + ' --custom_checkpoint ' + custom_checkpoint
+    print(cmd)
+    p = subprocess.Popen(['powershell', cmd], shell=True, stdout = subprocess.PIPE, stderr = subprocess.PIPE)
+    stdout, stderr = p.communicate()
 
 def FindExistingAssembliesOnNucleus(projectURL):
     # searches for existing assemblies of a given project
@@ -684,13 +715,15 @@ def FindExistingAssembliesOnNucleus(projectURL):
         existing_assembly_usd_links = None
     return stdout, stderr, existing_assembly_usd_links
 
-def GetPrimReferenceXForms(assemblyURL):
+def GetPrimReferenceXForms(assemblyURL, token = None):
     # Getter function to fetch reference, transform, rotation, and scale of objects in an assembly.
     batchfilepath = GetFetcherScriptsDirectory().replace(" ","` ")
     batchfilename = GetBatchFileName()
     batchfilepath = batchfilepath+batchfilename
 
     cmd = batchfilepath + ' --nucleus_url '+ str(assemblyURL) + ' --get_prim_reference_xforms '
+    if token!=None:
+        cmd = cmd + ' --token ' + str(token)
     print(cmd)
     p = subprocess.Popen(['powershell', cmd], shell=True, stdout = subprocess.PIPE, stderr = subprocess.PIPE)
     stdout, stderr = p.communicate()
@@ -1300,16 +1333,20 @@ class OmniverseAssemblyPanel:
                             print(obj.Label, obj.Nucleus_link_usd, obj.Nucleus_link_stp)
                         self.assembly_items_usd_links = [obj.Nucleus_link_usd for obj in self.selected_objects]
                         self.assembly_items_stp_links = [obj.Nucleus_link_stp for obj in self.selected_objects]
-
+                        shared_token = str(RandomTokenGenerator())
                         stdout, stderr, assembly_usd_link = CreateNewAssemblyOnNucleus(self.currentProjectURL, 
                             assembly_name = self.assembly_name, 
                             assembly_items_usd_links=self.assembly_items_usd_links, 
-                            assembly_items_stp_links=self.assembly_items_stp_links)
+                            assembly_items_stp_links=self.assembly_items_stp_links, 
+                            token = shared_token)
 
                         for line in stdout:
                             print('OmniClient', line)
                         for line in stderr:
                             print('ERRORS', line)
+                        custom_checkpoint_message = 'Add asset to assembly in ' + assembly_usd_link.split('/')[-1]
+                        for usd_link in self.assembly_items_usd_links:
+                            AddCheckpointToUSDOnNucleus(usd_link, custom_checkpoint=custom_checkpoint_message, token=shared_token)
 
                         print(assembly_usd_link)
                         FreeCAD.assembly_usd_link = assembly_usd_link
@@ -1348,26 +1385,29 @@ class OmniverseAssemblyPanel:
                 selected_assembly_usd_link = [usdlink for usdlink in self.existing_assembly_usd_links if assembly_name in usdlink][0]
                 print(selected_assembly_usd_link)
                 FreeCAD.assembly_usd_link = selected_assembly_usd_link
-                self.current_assembly_URL_text.setText(' \u2705 Current assembly: '+FreeCAD.assembly_usd_link.split('/')[-1])
-                self.status_header_text.setText(' Status: \u2705 Ready')
-                
+                shared_token = str(RandomTokenGenerator())
+
                 start_fetch_xform = time.time()
-                stdout, stderr, prim_data =  GetPrimReferenceXForms(selected_assembly_usd_link)
+                stdout, stderr, prim_data =  GetPrimReferenceXForms(selected_assembly_usd_link, token = shared_token)
                 # print('FETCH COMPONENT XFORM:', time.time()-start_fetch_xform, 's.')
                 print(prim_data)
-                token = str(RandomTokenGenerator())
-
+                
                 for dict_entry in prim_data:
                     stplink = dict_entry['step-path']
                     usdlink = dict_entry['ref-path']
                     start_fetch_geom = time.time()
                     rotation = dict_entry['rot-xyz'][::-1]
                     custom_checkpoint_message = 'Imported assembly into FreeCAD as part of '+ str(assembly_name)
-                    imported_obj = _DownloadCmdWrapper(stplink, usdlink, token, custom_checkpoint = custom_checkpoint_message)
+                    imported_obj = _DownloadCmdWrapper(stplink, usdlink, shared_token, custom_checkpoint = custom_checkpoint_message)
                     imported_obj.Placement.Base = FreeCAD.Vector(dict_entry['transform'])
                     imported_obj.Placement.Rotation = FreeCAD.Rotation(*rotation)
                     print('[INFO] Moving and rotating ', str(imported_obj.Label), 'to ', dict_entry['transform'], rotation)
                     # print('FETCH SINGLE COMPONENT:', time.time()-start_fetch_geom, 's.')
+
+                custom_checkpoint_message = 'Imported assembly into FreeCAD'
+                AddCheckpointToUSDOnNucleus(FreeCAD.assembly_usd_link, custom_checkpoint=custom_checkpoint_message, token=shared_token)
+                self.current_assembly_URL_text.setText(' \u2705 Current assembly: '+FreeCAD.assembly_usd_link.split('/')[-1])
+                self.status_header_text.setText(' Status: \u2705 Ready')
         else:
             print('[WARN] No existing assemblies found for this project!')
             msgBox = QtGui.QMessageBox()
@@ -1381,8 +1421,9 @@ class OmniverseAssemblyPanel:
 
             component_usd_links, base_placement = get_assembly_component_placement(type='base')
             component_usd_links, rotation_placement = get_assembly_component_placement(type='rotation')
+            token = str(RandomTokenGenerator())
 
-            stdout, stderr = MoveAssemblyXformPositions(assembly_usd_link, component_usd_links, base_placement, rotation_placement)
+            stdout, stderr = MoveAssemblyXformPositions(assembly_usd_link, component_usd_links, base_placement, rotation_placement, token = token)
 
         else:
             print('[WARN] No assembly link for this project specified to push to!')
@@ -1395,8 +1436,9 @@ class OmniverseAssemblyPanel:
         if FreeCAD.assembly_usd_link!= None:
             doc = FreeCAD.ActiveDocument
             assembly_usd_link = FreeCAD.assembly_usd_link
+            token = str(RandomTokenGenerator())
             start_fetch_xform = time.time()
-            stdout, stderr, prim_data =  GetPrimReferenceXForms(assembly_usd_link)
+            stdout, stderr, prim_data =  GetPrimReferenceXForms(assembly_usd_link, token = token)
             print('FETCH COMPONENT XFORM:', time.time()-start_fetch_xform, 's.')
             valid_freecad_objects = [obj for obj in doc.Objects if hasattr(obj, 'Nucleus_link_stp')]
             for dict_entry in prim_data:
@@ -1536,7 +1578,7 @@ def get_qproc_command_start_live(usdlink, session_name):
 async def run_live_assembly_listener(assembly_link, session_name):
     asyncio.new_event_loop().create_task(live_start_session(FreeCAD.assembly_usd_link, session_name))
 
-def MoveAssemblyXformPositions(assemblyURL, component_usd_links, xform_translate, xform_rotation):
+def MoveAssemblyXformPositions(assemblyURL, component_usd_links, xform_translate, xform_rotation, token=None):
     batchfilepath = GetFetcherScriptsDirectory().replace(" ","` ")
     batchfilename = GetBatchFileName()
     batchfilepath = batchfilepath+batchfilename
@@ -1546,6 +1588,8 @@ def MoveAssemblyXformPositions(assemblyURL, component_usd_links, xform_translate
     xform_translate = parse_list_into_set_srt_command_arg(xform_translate)
 
     cmd = batchfilepath + ' --nucleus_url '+ str(assemblyURL) + ' --move_assembly ' + ' --set_rot_xyz ' + str(xform_rotation) + ' --set_transform ' +  str(xform_translate) + ' --asset_usd_links ' + str(component_usd_links)
+    if token is not None:
+        cmd = cmd + ' --token ' + str(token)
     print(cmd)
     p = subprocess.Popen(['powershell', cmd], shell=True, stdout = subprocess.PIPE, stderr = subprocess.PIPE)
     stdout, stderr = p.communicate()
