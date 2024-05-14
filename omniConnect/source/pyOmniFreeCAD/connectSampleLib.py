@@ -325,7 +325,7 @@ def save_stage(stageUrl, comment=""):
     omni.usd_resolver.set_checkpoint_message("")
     omni.client.live_process()
 
-def createEmptyMeshPrim(stageUrl, prim_name):
+def createEmptyMeshPrim(stageUrl, prim_name, token = None):
     global g_stage
     default_prim_path = g_stage.GetDefaultPrim().GetPath().pathString
 
@@ -337,7 +337,12 @@ def createEmptyMeshPrim(stageUrl, prim_name):
     if not meshPrim:
         sys.exit("[ERROR] Failure to create empty mesh.")
 
-    save_stage(stageUrl, comment="Created empty mesh prim.")
+    if token ==None:
+        checkpoint_descriptor = 'NO_TOKEN - Created empty mesh prim.'
+    else:
+        checkpoint_descriptor = str(token) + ' - Created empty mesh prim.'
+
+    save_stage(stageUrl, comment=checkpoint_descriptor)
     return meshPrim
 
 def createXformWithReference(stageUrl, prim_name, reference_path, token=None):
@@ -1270,7 +1275,10 @@ if __name__ == "__main__":
     elif nucleus_url and create_new_usd==True:
         nucleus_url = createOmniverseModel(nucleus_url, live_edit=False)
         prim_name = 'testMesh'
-        meshPrim = createEmptyMeshPrim(nucleus_url, prim_name)
+        if token is not None:
+            meshPrim = createEmptyMeshPrim(nucleus_url, prim_name, token = token)
+        else:
+            meshPrim = createEmptyMeshPrim(nucleus_url, prim_name)
 
 
         if token is not None:
@@ -1370,7 +1378,10 @@ if __name__ == "__main__":
                 full_stp_asset_url = asset_path_url + '/'+asset_name+'.stp'
             # Create new USD file
             full_usd_asset_url = createOmniverseModel(full_usd_asset_url, live_edit=False)
-            meshPrim = createEmptyMeshPrim(full_usd_asset_url, asset_name)
+            if token is not None:
+                meshPrim = createEmptyMeshPrim(full_usd_asset_url, asset_name, token = token)
+            else:
+                meshPrim = createEmptyMeshPrim(full_usd_asset_url, asset_name)
 
             t = time.localtime()
             current_time = time.strftime("%H:%M:%S", t)

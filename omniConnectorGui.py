@@ -1269,7 +1269,7 @@ class OmniverseAssemblyPanel:
 
         if FreeCAD.assembly_usd_link != None:
             self.status_header_text = QtGui.QLabel(' Status: \u2705 Ready')
-            self.current_assembly_URL_text = QtGui.QLabel(' \u2705 Current assembly: '+ str(FreeCAD.assembly_usd_link))
+            self.current_assembly_URL_text = QtGui.QLabel(' \u2705 Current assembly: '+ str(FreeCAD.assembly_usd_link.split('/')[-1]))
         else:
             self.status_header_text = QtGui.QLabel(' Status: \u274c')
             self.current_assembly_URL_text = QtGui.QLabel(' \u274c No assembly selected.')
@@ -1350,7 +1350,8 @@ class OmniverseAssemblyPanel:
 
                         print(assembly_usd_link)
                         FreeCAD.assembly_usd_link = assembly_usd_link
-                        self.current_assembly_URL_text.setText(' \u2705 Current assembly: '+FreeCAD.assembly_usd_link)
+                        self.current_assembly_URL_text.setText(' \u2705 Current assembly: '+FreeCAD.assembly_usd_link.split('/')[-1])
+                        
                         self.status_header_text.setText(' Status: \u2705 Ready')
 
                     else:
