@@ -6,7 +6,7 @@ echo === BEGINNING INSTALLATION OF FREECAD OMNIVERSE CONNECTOR ===
 
 echo --- Pulling Connect Sample v202.0...
  
-git clone --quiet https://github.com/raska-s/ovConnectSample.git temp
+git clone --quiet https://github.com/Metaverse-Colab-for-Fusion-Energy/ovConnectSample.git temp
 
 rd ".\temp\.git\" /q /s
 
