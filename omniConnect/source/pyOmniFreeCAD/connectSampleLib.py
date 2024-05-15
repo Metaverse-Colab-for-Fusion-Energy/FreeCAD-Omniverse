@@ -661,7 +661,7 @@ def get_all_xform_reference_paths(stageUrl, token=None):
                     scale = tuple(scale)
 
                 print(prim_reference, ' | ', translate, ' | ', rot_xyz, ' | ', scale)
-    checkpoint_descriptor = ' - Sent Xform positions to FreeCAD'
+    checkpoint_descriptor = ' - Sent assembly geometry positions to FreeCAD'
     if token==None:
         token = 'NO_TOKEN'
     checkpoint_descriptor = str(token) + checkpoint_descriptor
@@ -710,8 +710,6 @@ def set_xform_srt_from_reference_asset_path(assembly_stage_url, list_dict_prim_d
         checkpoint_descriptor = str(token) + ' - Moved assembly geometry using FreeCAD'
     save_stage(assembly_stage_url, comment=checkpoint_descriptor)
     return None
-
-
 
 def do_xform_translation_rotation(prim, transform, rotate):
     prim.GetPrim()
@@ -1416,9 +1414,9 @@ if __name__ == "__main__":
             assembly_usd_url = assembly_folder_url+'/assembly.usda'
         assembly_usd_url = createOmniverseModel(assembly_usd_url, live_edit=False)
         if token is not None:
-            save_stage(assembly_usd_url, comment = str(token) + ' - Created new assembly file.')
+            save_stage(assembly_usd_url, comment = str(token) + ' - Created new assembly file')
         else:
-            save_stage(assembly_usd_url, comment = 'NO_TOKEN - Created new assembly file.')
+            save_stage(assembly_usd_url, comment = 'NO_TOKEN - Created new assembly file')
 
         default_prim_path = g_stage.GetDefaultPrim().GetPath().pathString
 
