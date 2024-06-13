@@ -27,7 +27,9 @@ Command:
 
 Advanced installation
 -----------------------
-This subsection outlines the steps required to install the software manually, without using the automated script. The user will have to have Omniverse Launcher installed prior to carrying out this installation process.
+This subsection outlines the steps required to install the software manually, without using the automated script. Only proceed if the basic installation does not work. 
+
+The user will have to have Omniverse Launcher installed prior to carrying out this installation process.
 
 1.	Git clone the FreeCAD Connector repository.
 
@@ -36,10 +38,6 @@ Command:
 ``git clone https://github.com/Metaverse-Colab-for-Fusion-Energy/FreeCAD-Omniverse.git``
 
 2. Navigate to the cloned repository’s directory and copy the contents of ``src`` into your FreeCAD ``\Mod`` directory. Typically, this is ``C:\Users\USER_NAME\AppData\Roaming\FreeCAD\Mod``. 
-
-Command:
-
-``git clone https://github.com/Metaverse-Colab-for-Fusion-Energy/FreeCAD-Omniverse.git``
 
 3.	Open Omniverse Launcher. Under the Exchange tab, navigate to the Connect Sample page. This can be done using the search bar or under the Connectors tab on the left-hand side of the window. 
 
