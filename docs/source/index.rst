@@ -9,13 +9,16 @@ FreeCAD-Omniverse Documentation
 .. figure:: figs/mainpic.png
    :class: with-border
 
+
+
 Table of Contents
 ------------------
+* :ref:`search`
 .. toctree::
    :maxdepth: 3
 
    introduction
-   installation/launcher_setup
+   installation/pre_install
    installation/install_all
    system/system
    user_interface/user_interface
@@ -23,9 +26,8 @@ Table of Contents
 
 
 
-Indices and tables
-------------------
+.. Indices and tables
+.. ------------------
 
-* :ref:`genindex`
-* :ref:`modindex`
-* :ref:`search`
+.. * :ref:`genindex`
+.. * :ref:`modindex`

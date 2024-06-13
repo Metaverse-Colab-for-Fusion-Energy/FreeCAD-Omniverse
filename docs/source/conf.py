@@ -7,8 +7,8 @@
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
 project = 'FreeCAD-Omniverse'
-copyright = '2024, Raska'
-author = 'Raska'
+copyright = '2024, Raska Soemantoro'
+author = 'Raska Soemantoro'
 release = '0.1'
 
 # -- General configuration ---------------------------------------------------
