@@ -11,7 +11,9 @@ This software makes CAD geometry created on FreeCAD available on NVIDIA Omnivers
 ---
 
 ## Installation
-1. Clone this repository to your FreeCAD \Mod directory. Typically, this is `C:\Users\username\AppData\Roaming\FreeCAD\Mod`
+1. Clone this repository. 
+
+2. Copy and paste the contents of the `src` folder into your FreeCAD \Mod directory. Typically, this is `C:\Users\username\AppData\Roaming\FreeCAD\Mod`
 
 > Note: if the `AppData\Roaming\FreeCAD\Mod` file directory does not exist, you must first initialise this folder. This happens if no FreeCAD addons have been previously installed. To do this, launch FreeCAD, and on the toolbar click `Tools` > `Addon Manager`. If you are using the Addon Manager for the first time, a dialog box will open, warning you that the addons in the Addon manager are not officially part of FreeCAD. It also presents several options related to the Addon Manager's data usage. Adjust those options to your liking and press the `OK` button to continue. The `\Mod` directory should now exist. 
 
@@ -19,11 +21,10 @@ This software makes CAD geometry created on FreeCAD available on NVIDIA Omnivers
 
 3. Installation complete.
 
+
 ## Documentation
 > documentation to be added
 
 ## TODO
 - delete useless pyfiles
-- put documentation here (there is a howto somewhere...) - A draft documentation docx has just been added but this needs to be fixed to match the latest update
-- (maybe) restrict installation file
 - test fresh install again
