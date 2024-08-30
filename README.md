@@ -28,7 +28,3 @@ Documentation is available in the `docs` directory. Documentation build steps ar
 1. Navigate to the `docs` directory.
 2. Run `.\make.bat html` in this directory.
 3. Documentation files should be available in the `\build\html` directory. The main documentation page is viewable in html format at `\docs\build\html\index.html`.
-
-## TODO
-- delete useless pyfiles
-- test fresh install again
