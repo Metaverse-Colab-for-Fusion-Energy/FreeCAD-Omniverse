@@ -22,16 +22,16 @@ echo --- Fetching Connect Sample dependencies...
 
 call .\omniConnect\repo.bat build --fetch-only
 
-rd .\omniConnect\helloWorld /s /q
-rd .\omniConnect\liveSession /s /q
-rd .\omniConnect\omnicli /s /q
-rd .\omniConnect\omniSensorThread /s /q 
+rd .\omniConnect\source\helloWorld /s /q
+rd .\omniConnect\source\liveSession /s /q
+rd .\omniConnect\source\omnicli /s /q
+rd .\omniConnect\source\omniSensorThread /s /q 
 
-rd .\omniConnect\omniSimpleSensor /s /q
-rd .\omniConnect\omniUsdaWatcher /s /q
-rd .\omniConnect\omniUsdReader /s /q
-rd .\omniConnect\omniUtilsLib /s /q 
-rd .\omniConnect\PyHelloWorld /s /q 
+rd .\omniConnect\source\omniSimpleSensor /s /q
+rd .\omniConnect\source\omniUsdaWatcher /s /q
+rd .\omniConnect\source\omniUsdReader /s /q
+rd .\omniConnect\source\omniUtilsLib /s /q 
+rd .\omniConnect\source\PyHelloWorld /s /q 
 
 echo --- Fetching Python dependencies...
 
