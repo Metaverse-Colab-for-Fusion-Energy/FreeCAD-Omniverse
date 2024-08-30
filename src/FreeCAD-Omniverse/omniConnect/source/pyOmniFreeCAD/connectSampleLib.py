@@ -154,8 +154,7 @@ def createOmniverseModel(stageUrl, live_edit):
 
 
 def logConnectedUsername(stageUrl, output_log = True):
-    _, serverInfo = omni.client.get_server_info(stageUrl)
-
+    result, serverInfo = omni.client.get_server_info(stageUrl)
     if serverInfo:
         if output_log:
             # print(dir(serverInfo))
@@ -164,6 +163,8 @@ def logConnectedUsername(stageUrl, output_log = True):
             print("Connected username: "+ serverInfo.username)
         return serverInfo.username
     else:
+        print("ERROR: "+ result.name)
+        LOGGER.info("ERROR: %s", result.name)
         return None
 
 def getHostFromURL(stageUrl):
@@ -1339,7 +1340,11 @@ if __name__ == "__main__":
         print(new_url)
         result = createEmptyFolder(new_url)
         if result != 'OK':
-            print('ERROR: '+ str(result)+' A project with that name already exists! Connect to the existing project or use a different project name.')
+            if result =='ERROR_CONNECTION':
+                stringError = 'ERROR: '+ str(result) + ' Failed to connect to '+ base_url
+            else:
+                stringError = 'ERROR: '+ str(result)
+            print(stringError)
 
 ### FUNC TO CREATE NEW ASSET
     elif create_new_asset ==True and asset_name:
