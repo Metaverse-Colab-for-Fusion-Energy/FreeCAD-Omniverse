@@ -1673,6 +1673,9 @@ class OmniConnectionSettingsPanel:
         self.project_disconnect_button = QtGui.QPushButton("Disconnect from project")
         self.project_disconnect_button.clicked.connect(self.disconnect_from_project)
 
+        self.about_button = QtGui.QPushButton("About")
+        self.about_button.clicked.connect(self.show_about_page)
+
         layout.addWidget(self.panel_name_text)
         layout.addWidget(self.open_existing_project_button)
         layout.addWidget(self.create_new_project_button)        
@@ -1682,6 +1685,7 @@ class OmniConnectionSettingsPanel:
         layout.addWidget(self.selected_asset_text)
         layout.addWidget(self.selected_asset_usd_text)
         layout.addWidget(self.project_disconnect_button)
+        layout.addWidget(self.about_button)
 
         # Deprecated refresh connection/check connection fuction
         # self.check_button = QtGui.QPushButton("Validate link")
@@ -1689,6 +1693,12 @@ class OmniConnectionSettingsPanel:
         # layout.addWidget(self.check_button)
 
         self.form.setLayout(layout)
+
+    def show_about_page(self):
+        msgBox = QtGui.QMessageBox()
+        msgBox.setIcon(QtGui.QMessageBox.Information)
+        msgBox.setText("FreeCAD Omniverse Connector\nVersion 3.0.1 \n\u00A9 2024 The University of Manchester")
+        msgBox.exec_()
 
     def disconnect_from_project(self):
         if 'is_connected_to_nucleus_project' not in dir(FreeCAD):
