@@ -33,6 +33,15 @@ rd .\omniConnect\source\omniUsdReader /s /q
 rd .\omniConnect\source\omniUtilsLib /s /q 
 rd .\omniConnect\source\PyHelloWorld /s /q 
 
+del .\omniConnect\run_py_live_session.bat 
+del .\omniConnect\run_py_hello_world.bat 
+del .\omniConnect\run_omniUsdaWatcher.bat 
+del .\omniConnect\run_omniSimpleSensor.bat 
+del .\omniConnect\run_live_session.bat 
+del .\omniConnect\run_hello_world.bat 
+
+
+
 echo --- Fetching Python dependencies...
 
 .\omniConnect\_build\target-deps\python\python.exe -m pip install open3d aioconsole --quiet
