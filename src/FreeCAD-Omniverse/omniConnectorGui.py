@@ -1697,7 +1697,7 @@ class OmniConnectionSettingsPanel:
     def show_about_page(self):
         msgBox = QtGui.QMessageBox()
         msgBox.setIcon(QtGui.QMessageBox.Information)
-        msgBox.setText("FreeCAD Omniverse Connector\nVersion 3.0.1 \n\u00A9 2024 The University of Manchester")
+        msgBox.setText("FreeCAD Omniverse Connector\nVersion 3.0.2 \n\u00A9 2024 The University of Manchester")
         msgBox.exec_()
 
     def disconnect_from_project(self):
