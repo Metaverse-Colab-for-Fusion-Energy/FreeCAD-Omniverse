@@ -1506,24 +1506,30 @@ if __name__ == "__main__":
     elif nucleus_url and push_non_usd ==True and local_non_usd_filename:
         local_upload_file_path = local_non_usd_filename
         try:
-            local_bin_f = open(local_upload_file_path, "rb")
-            bin_data = local_bin_f.read()
-            print('Read from '+ local_upload_file_path + ' OK')
-            data = bytearray(bin_data)
+            with open(local_upload_file_path, "rb") as local_bin_f:
+                bin_data = local_bin_f.read()
+                print(f'Read {len(bin_data)} bytes from {local_upload_file_path} OK')
+                data = bytearray(bin_data)
+                print(f'Converted to bytearray: {len(data)} bytes')
+
+                # Confirm the data length matches the file size
+                if len(data) != len(bin_data):
+                    print("[ERROR] Byte array length does not match file size")
         except FileNotFoundError:
             print('[ERROR] FileNotFoundError. Check file name.')
+
         if custom_checkpoint is not None:
             checkpoint_descriptor = str(token) + ' - ' + custom_checkpoint[0]
         else:
-            if token is not None:
-                checkpoint_descriptor = str(token) + " - Push from FreeCAD"
-            else:
-                checkpoint_descriptor = "NO_TOKEN - Push from FreeCAD"
+            checkpoint_descriptor = (str(token) if token is not None else "NO_TOKEN") + " - Push from FreeCAD"
 
-        upload_result = omni.client.write_file(url=nucleus_url, 
-            content=data, 
-            message=checkpoint_descriptor)
-        print('Write to Nucleus: ' +str(upload_result))
+        # Attempt to write to Nucleus and print result
+        upload_result = omni.client.write_file_ex(
+            url=nucleus_url, 
+            content=bin_data, 
+            message=checkpoint_descriptor
+        )
+        print('Write to Nucleus: ' + str(upload_result))
         local_bin_f.close()
 
     elif nucleus_url and pull_non_usd==True and local_non_usd_filename:

@@ -49,21 +49,22 @@ __dir__ = os.path.dirname(__file__)
 # FreeCAD Command made with a Python script
 def GetFetcherScriptsDirectory():
     workbench_path = os.path.dirname(os.path.realpath(__file__))
-    omni_directory = workbench_path + '/omniConnect'
+    omni_directory = os.path.join(workbench_path, 'omniConnect')
+    # omni_directory = workbench_path + '/omniConnect'
     return omni_directory
 
 def GetLocalDirectoryName():
     workbench_path = os.path.dirname(os.path.realpath(__file__))
-    local_directory = workbench_path+"/session_local"
+    local_directory = os.path.join(workbench_path, 'session_local')
     if not os.path.exists(local_directory):
         os.makedirs(local_directory)
     return local_directory
 
 def GetBatchFileName(live=False):
     if live == False:
-        batchfilename = "/run_py_omni_client.bat"
+        batchfilename = "run_py_omni_client.bat"
     else:
-        batchfilename = '/run_py_omni_live_client.bat'
+        batchfilename = 'run_py_omni_live_client.bat'
     return batchfilename
 
 def ClearLocalDirectory():
@@ -315,7 +316,7 @@ def GetCurrentSelection():
 def GetAuthCheck(usdlink, filetype='usd'):
     batchfilepath = GetFetcherScriptsDirectory().replace(" ","` ")
     batchfilename = GetBatchFileName()
-    batchfilepath += batchfilename 
+    batchfilepath = os.path.join(batchfilepath, batchfilename)
     error_code_no_permissions = 'NO_PERMISSION'
     error_code_link_not_found = 'NOT_FOUND'
     error_code_no_auth = 'NO_AUTH'
@@ -358,7 +359,7 @@ def GetAuthCheck(usdlink, filetype='usd'):
 def FindUSDandSTPFiles(usdlink):
     batchfilepath = GetFetcherScriptsDirectory().replace(" ","` ")
     batchfilename = GetBatchFileName()
-    batchfilepath += batchfilename
+    batchfilepath = os.path.join(batchfilepath, batchfilename)
     local_directory = GetLocalDirectoryName()
     print('Finding asset files on project folder ...')
     cmd = batchfilepath + ' --local_directory ' + local_directory + ' --nucleus_url ' + usdlink +' --find_stp_and_usd_files'
@@ -429,7 +430,7 @@ def UploadUSDToNucleus(usdlink, selected_object, token, existing_usd = True):
         # Batch file where the OV USD uploader lives
             batchfilepath = GetFetcherScriptsDirectory().replace(" ","` ")
             batchfilename = GetBatchFileName()
-            batchfilepath = batchfilepath+batchfilename
+            batchfilepath = os.path.join(batchfilepath, batchfilename)
             # local directory where copies are staged
             local_STL_path = GetLocalDirectoryName()
             print('local_STL_path', local_STL_path)
@@ -470,13 +471,14 @@ def UploadSTPToNucleus(stplink, selected_object, token, existing_stp = True, cus
         # Batch file where the OV USD uploader lives
             batchfilepath = GetFetcherScriptsDirectory().replace(" ","` ")
             batchfilename = GetBatchFileName()
-            batchfilepath = batchfilepath+batchfilename
+            batchfilepath = os.path.join(batchfilepath, batchfilename)
             # local directory where copies are staged
             local_directory = GetLocalDirectoryName()
             # A one-time token for fetching to make sure get the right file. This needs to be a random string
             # token = str(RandomTokenGenerator())
             print('Unique version identifier: '+token)
-            local_STP_filepath = local_directory +  '/'+token+'upload.stp'
+            # local_STP_filepath = local_directory +  '/'+token+'upload.stp'
+            local_STP_filepath = os.path.join(local_directory, token+'upload.stp')
             ImportGui.export([selected_object], local_STP_filepath)
             # selected_object.Label2 = str([stplink, token])
             # Parsing commands for the batchfile
@@ -512,7 +514,7 @@ def DownloadUSDFromNucleus(usdlink):
         # Batch file where the OV USD fetcher lives
         batchfilepath = GetFetcherScriptsDirectory().replace(" ","` ")
         batchfilename = GetBatchFileName()
-        batchfilepath = batchfilepath+batchfilename
+        batchfilepath = os.path.join(batchfilepath, batchfilename)
         # local directory where copies are staged
         local_STL_path = GetLocalDirectoryName()
         # A one-time token for fetching to make sure get the right file. This needs to be a random string
@@ -569,14 +571,14 @@ def DownloadSTPFromNucleus(stplink, token, custom_checkpoint = None):
         # Batch file where the OV USD fetcher lives
         batchfilepath = GetFetcherScriptsDirectory().replace(" ","` ")
         batchfilename = GetBatchFileName()
-        batchfilepath = batchfilepath+batchfilename
+        batchfilepath = os.path.join(batchfilepath, batchfilename)
         # local directory where copies are staged
         local_directory_path = GetLocalDirectoryName()
         # A one-time token for fetching to make sure get the right file. This needs to be a random string
         print('Unique version identifier: '+token)
 
-        local_STP_filepath = local_directory_path +'/'+token+'download.stp'
-
+        # local_STP_filepath = local_directory_path +'/'+token+'download.stp'
+        local_STP_filepath = os.path.join(local_directory, token+'download.stp')
         # Parsing commands for the batchfile
         cmd = batchfilepath  + ' --nucleus_url '+ stplink + ' --pull_non_usd ' + " --local_non_usd_filename "+ local_STP_filepath.replace(" ","` ") + " --token " + token
         if custom_checkpoint != None:
@@ -608,7 +610,7 @@ def CreateNewProjectOnNucleus(host_name, project_name, make_public=False):
     # Calls function that creates new directory on Nucleus for projects
     batchfilepath = GetFetcherScriptsDirectory().replace(" ","` ")
     batchfilename = GetBatchFileName()
-    batchfilepath = batchfilepath+batchfilename
+    batchfilepath = os.path.join(batchfilepath, batchfilename)
     if make_public ==False:
         cmd = batchfilepath + ' --create_new_project ' + ' --project_name ' + str(project_name) + ' --host_name ' + str(host_name)
     elif make_public ==True:
@@ -632,7 +634,7 @@ def CreateNewAssemblyOnNucleus(projectURL, assembly_name = None, assembly_items_
     #a wrapper function for create new assembly
     batchfilepath = GetFetcherScriptsDirectory().replace(" ","` ")
     batchfilename = GetBatchFileName()
-    batchfilepath = batchfilepath+batchfilename
+    batchfilepath = os.path.join(batchfilepath, batchfilename)
 
     assembly_usd_link = None
 
@@ -665,7 +667,7 @@ def CreateNewAssemblyOnNucleus(projectURL, assembly_name = None, assembly_items_
 def AddCheckpointToUSDOnNucleus(usd_url, custom_checkpoint, token=None):
     batchfilepath = GetFetcherScriptsDirectory().replace(" ","` ")
     batchfilename = GetBatchFileName()
-    batchfilepath = batchfilepath+batchfilename
+    batchfilepath = os.path.join(batchfilepath, batchfilename)
     custom_checkpoint = '\"'+ custom_checkpoint + '\"'
 
     cmd = batchfilepath + ' --nucleus_url ' + str(usd_url) + ' --add_checkpoint_to_usd '
@@ -680,7 +682,7 @@ def AddCheckpointToUSDOnNucleus(usd_url, custom_checkpoint, token=None):
 def AddCheckpointToNonUSDOnNucleus(usd_url, custom_checkpoint, token=None):
     batchfilepath = GetFetcherScriptsDirectory().replace(" ","` ")
     batchfilename = GetBatchFileName()
-    batchfilepath = batchfilepath+batchfilename
+    batchfilepath = os.path.join(batchfilepath, batchfilename)
     custom_checkpoint = '\"'+ custom_checkpoint + '\"'
     cmd = batchfilepath + ' --nucleus_url ' + str(usd_url) + ' --add_checkpoint_to_non_usd ' 
     if token!=None:
@@ -695,7 +697,7 @@ def FindExistingAssembliesOnNucleus(projectURL):
     # searches for existing assemblies of a given project
     batchfilepath = GetFetcherScriptsDirectory().replace(" ","` ")
     batchfilename = GetBatchFileName()
-    batchfilepath = batchfilepath+batchfilename
+    batchfilepath = os.path.join(batchfilepath, batchfilename)
 
     cmd = batchfilepath + ' --nucleus_url '+ str(projectURL) + ' --find_existing_assemblies '
     print(cmd)
@@ -719,7 +721,7 @@ def GetPrimReferenceXForms(assemblyURL, token = None):
     # Getter function to fetch reference, transform, rotation, and scale of objects in an assembly.
     batchfilepath = GetFetcherScriptsDirectory().replace(" ","` ")
     batchfilename = GetBatchFileName()
-    batchfilepath = batchfilepath+batchfilename
+    batchfilepath = os.path.join(batchfilepath, batchfilename)
 
     cmd = batchfilepath + ' --nucleus_url '+ str(assemblyURL) + ' --get_prim_reference_xforms '
     if token!=None:
@@ -758,7 +760,7 @@ def GetPrimReferenceXForms(assemblyURL, token = None):
 def CreateNewAssetOnNucleus(asset_name, use_url = True, projectURL=None, host_name=None, project_name=None, token=None):
     batchfilepath = GetFetcherScriptsDirectory().replace(" ","` ")
     batchfilename = GetBatchFileName()
-    batchfilepath = batchfilepath+batchfilename
+    batchfilepath = os.path.join(batchfilepath, batchfilename)
     if use_url ==False:
         cmd = batchfilepath + ' --create_new_asset ' + ' --project_name ' + str(project_name) + ' --host_name ' + str(host_name) + ' --asset_name ' + str(asset_name)
     elif use_url==True:
@@ -1223,7 +1225,7 @@ def live_get_available_sessions(usdlink):
     # Batch file where the OV USD fetcher lives
     batchfilepath = GetFetcherScriptsDirectory().replace(" ","` ")
     batchfilename = GetBatchFileName(live=True)
-    batchfilepath = batchfilepath+batchfilename
+    batchfilepath = os.path.join(batchfilepath, batchfilename)
 
     cmd = batchfilepath + ' --nucleus_url'+' '+ usdlink + ' --find_sessions'
     print(cmd)
@@ -1570,7 +1572,7 @@ def get_qproc_command_start_live(usdlink, session_name):
     # Batch file where the OV USD fetcher lives
     batchfilepath = GetFetcherScriptsDirectory().replace(" ","` ")
     batchfilename = GetBatchFileName(live=True)
-    batchfilepath = batchfilepath+batchfilename
+    batchfilepath = os.path.join(batchfilepath, batchfilename)
 
     cmd = batchfilepath + ' --nucleus_url'+' '+ usdlink + ' --session_name ' + session_name + ' --start_live '
     return cmd    
@@ -1582,7 +1584,7 @@ async def run_live_assembly_listener(assembly_link, session_name):
 def MoveAssemblyXformPositions(assemblyURL, component_usd_links, xform_translate, xform_rotation, token=None):
     batchfilepath = GetFetcherScriptsDirectory().replace(" ","` ")
     batchfilename = GetBatchFileName()
-    batchfilepath = batchfilepath+batchfilename
+    batchfilepath = os.path.join(batchfilepath, batchfilename)
 
     component_usd_links = ' '.join(component_usd_links)
     xform_rotation = parse_list_into_set_srt_command_arg(xform_rotation)
