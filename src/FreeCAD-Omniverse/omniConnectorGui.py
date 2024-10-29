@@ -85,14 +85,14 @@ def RandomTokenGenerator():
 
 def SaveUSDLinkAsTextFile(usdlink):
     local_directory = GetLocalDirectoryName()
-    FreeCAD.OV_link_usd = str(usdlink)
+    FreeCAD.OV_link_usd = clean_omniverse_path(str(usdlink))
     textfile_name = local_directory+'/usdlink.txt'
     with open(textfile_name, 'w') as f:
         f.write(usdlink)
 
 def SaveLastProjectLinkAsTextFile(usdlink):
     local_directory = GetLocalDirectoryName()
-    FreeCAD.OV_link_project= str(usdlink)
+    FreeCAD.OV_link_project= clean_omniverse_path(str(usdlink))
     textfile_name = local_directory+'/last_projectlink.txt'
     with open(textfile_name, 'w') as f:
         f.write(usdlink)
@@ -100,14 +100,14 @@ def SaveLastProjectLinkAsTextFile(usdlink):
 
 def SaveProjectLinkAsTextFile(usdlink):
     local_directory = GetLocalDirectoryName()
-    FreeCAD.OV_link_project= str(usdlink)
+    FreeCAD.OV_link_project= clean_omniverse_path(str(usdlink))
     textfile_name = local_directory+'/projectlink.txt'
     with open(textfile_name, 'w') as f:
         f.write(usdlink)
 
 def SaveSTPLinkAsTextFile(stplink):
     local_directory = GetLocalDirectoryName()
-    FreeCAD.OV_link_stp = str(stplink)
+    FreeCAD.OV_link_stp = clean_omniverse_path(str(stplink))
     textfile_name = local_directory+'/stplink.txt'
     with open(textfile_name, 'w') as f:
         f.write(stplink)
@@ -819,7 +819,7 @@ def get_assembly_component_placement(type='base'):
     if type =='base':
         placement = [tuple(obj.Placement.Base) for obj in valid_freecad_objects]
     elif type == 'rotation':
-        placement = [tuple(obj.Placement.Rotation.getYawPitchRoll())[::-1] for obj in valid_freecad_objects] 
+        placement = [tuple(obj.Placement.Rotation.getYawPitchRoll()) for obj in valid_freecad_objects] 
     component_usd_links = [obj.Nucleus_link_usd  for obj in valid_freecad_objects]
     return component_usd_links, placement
 
@@ -1129,7 +1129,7 @@ def GetListOfAssemblyObjects(projectURL):
     object_label_list = []
     for obj in doc.Objects:
         if 'Nucleus_link_usd' in dir(obj):
-            if projectURL in str(obj.Nucleus_link_usd):
+            if clean_omniverse_path(projectURL) in str(obj.Nucleus_link_usd):
                 object_list.append(obj)
                 object_label_list.append(obj.Label)
     return object_list, object_label_list
@@ -1275,7 +1275,7 @@ class OmniverseAssemblyPanel:
             self.current_assembly_URL_text = QtGui.QLabel(' \u274c No assembly selected.')
         # self.current_assembly_URL_text = 
         
-        self.create_new_assembly_button = QtGui.QPushButton("Create new assembly from workspace objects")
+        self.create_new_assembly_button = QtGui.QPushButton("Make assembly from workspace objects")
         self.create_new_assembly_button.clicked.connect(self.flow_create_new_assembly)
 
         self.open_existing_assembly_button = QtGui.QPushButton("Import existing assembly into workspace")
@@ -1632,6 +1632,12 @@ def no_restricted_strings_in_project_link(projectlink):
     asset_in_link = 'asset' in projectlink
     return not(asset_in_link or assembly_in_link)
 
+def clean_omniverse_path(path):
+    # Use regex to find any double slashes after the protocol part and replace with a single slash
+    cleaned_path = re.sub(r'(?<!:)//+', '/', path)
+    return cleaned_path
+
+
 class OmniConnectionSettingsPanel:
     # Omniverse connection settings panel
     def __init__(self,widget):
@@ -1846,7 +1852,7 @@ class OmniConnectionSettingsPanel:
         if projectURL!='':
             if '.usd' not in projectURL:
                 if no_restricted_strings_in_project_link(projectURL) ==True:
-                    check_project_ok = self.checkProjectURL(inputProjectURL = projectURL)
+                    check_project_ok = self.checkProjectURL(inputProjectURL = clean_omniverse_path(projectURL))
                     if check_project_ok ==True:
                         delete_asset_localdata()
                         self.selected_asset_text.setText(' \u274c No STP asset selected.')
