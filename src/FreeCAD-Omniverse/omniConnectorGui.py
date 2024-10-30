@@ -578,7 +578,7 @@ def DownloadSTPFromNucleus(stplink, token, custom_checkpoint = None):
         print('Unique version identifier: '+token)
 
         # local_STP_filepath = local_directory_path +'/'+token+'download.stp'
-        local_STP_filepath = os.path.join(local_directory, token+'download.stp')
+        local_STP_filepath = os.path.join(local_directory_path, token+'download.stp')
         # Parsing commands for the batchfile
         cmd = batchfilepath  + ' --nucleus_url '+ stplink + ' --pull_non_usd ' + " --local_non_usd_filename "+ local_STP_filepath.replace(" ","` ") + " --token " + token
         if custom_checkpoint != None:
