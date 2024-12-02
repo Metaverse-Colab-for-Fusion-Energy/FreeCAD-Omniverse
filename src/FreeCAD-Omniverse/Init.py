@@ -24,3 +24,6 @@
 #***************************************************************************/
 
 FreeCAD.assembly_usd_link = None
+FreeCAD.is_connected_to_nucleus_project = None
+FreeCAD.is_exist_secondary_usdlink = None
+FreeCAD.is_exist_secondary_stplink = None

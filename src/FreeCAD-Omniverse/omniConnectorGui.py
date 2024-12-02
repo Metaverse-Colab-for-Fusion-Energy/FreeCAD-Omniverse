@@ -91,6 +91,14 @@ def SaveUSDLinkAsTextFile(usdlink):
     with open(textfile_name, 'w') as f:
         f.write(usdlink)
 
+
+def SaveSecondaryUSDLinkAsTextFile(usdlink):
+    local_directory = GetLocalDirectoryName()
+    FreeCAD.OV_link_usd = clean_omniverse_path(str(usdlink))
+    textfile_name = local_directory+'/secondary_usdlink.txt'
+    with open(textfile_name, 'w') as f:
+        f.write(usdlink)
+
 def SaveLastProjectLinkAsTextFile(usdlink):
     local_directory = GetLocalDirectoryName()
     FreeCAD.OV_link_project= clean_omniverse_path(str(usdlink))
@@ -113,6 +121,14 @@ def SaveSTPLinkAsTextFile(stplink):
     with open(textfile_name, 'w') as f:
         f.write(stplink)
 
+def SaveSecondarySTPLinkAsTextFile(stplink):
+    local_directory = GetLocalDirectoryName()
+    FreeCAD.OV_link_stp = clean_omniverse_path(str(stplink))
+    textfile_name = local_directory+'/secondary_stplink.txt'
+    with open(textfile_name, 'w') as f:
+        f.write(stplink)
+
+
 def SaveUSDPermissionsAsTextFile(permission):
     local_directory = GetLocalDirectoryName()
     FreeCAD.OV_permission_usd =permission
@@ -120,6 +136,12 @@ def SaveUSDPermissionsAsTextFile(permission):
     with open(textfile_name, 'w') as f:
         f.write(permission)
 
+def SaveSecondaryUSDPermissionsAsTextFile(permission):
+    local_directory = GetLocalDirectoryName()
+    FreeCAD.OV_permission_usd =permission
+    textfile_name = local_directory+'/secondary_usd_permission.txt'
+    with open(textfile_name, 'w') as f:
+        f.write(permission)
 def SaveProjectPermissionsAsTextFile(permission):
     local_directory = GetLocalDirectoryName()
     FreeCAD.OV_permission_project =permission
@@ -131,6 +153,13 @@ def SaveSTPPermissionsAsTextFile(permission):
     local_directory = GetLocalDirectoryName()
     FreeCAD.OV_permission_stp =permission
     textfile_name = local_directory+'/stp_permission.txt'
+    with open(textfile_name, 'w') as f:
+        f.write(permission)
+
+def SaveSecondarySTPPermissionsAsTextFile(permission):
+    local_directory = GetLocalDirectoryName()
+    FreeCAD.OV_permission_stp =permission
+    textfile_name = local_directory+'/secondary_stp_permission.txt'
     with open(textfile_name, 'w') as f:
         f.write(permission)
 
@@ -167,19 +196,33 @@ def delete_asset_localdata():
 
 
 
-def GetCurrentUSDPermissions():
-    try:
-        local_directory = GetLocalDirectoryName()
-        textfile_name = local_directory+'/usd_permission.txt'
-        with open(textfile_name) as f:
-            lines = f.readlines()
-        if len(lines) != 0:
-            permission = lines[0]
-        else:
-            permission=None
-        return permission
-    except IOError:
-        return None
+def GetCurrentUSDPermissions(secondary=False):
+    if secondary==False:
+        try:
+            local_directory = GetLocalDirectoryName()
+            textfile_name = local_directory+'/usd_permission.txt'
+            with open(textfile_name) as f:
+                lines = f.readlines()
+            if len(lines) != 0:
+                permission = lines[0]
+            else:
+                permission=None
+            return permission
+        except IOError:
+            return None
+    elif secondary == True:
+        try:
+            local_directory = GetLocalDirectoryName()
+            textfile_name = local_directory+'/secondary_usd_permission.txt'
+            with open(textfile_name) as f:
+                lines = f.readlines()
+            if len(lines) != 0:
+                permission = lines[0]
+            else:
+                permission=None
+            return permission
+        except IOError:
+            return None
 
 def GetCurrentProjectPermissions():
     try:
@@ -195,21 +238,35 @@ def GetCurrentProjectPermissions():
     except IOError:
         return None
 
-def GetCurrentSTPPermissions():
-    try:
-        local_directory = GetLocalDirectoryName()
-        textfile_name = local_directory+'/stp_permission.txt'
-        with open(textfile_name) as f:
-            lines = f.readlines()
-        if len(lines) != 0:
-            permission = lines[0]
-        else:
-            permission=None
-        return permission
-    except IOError:
-        return None
+def GetCurrentSTPPermissions(secondary=False):
+    if secondary==False:
+        try:
+            local_directory = GetLocalDirectoryName()
+            textfile_name = local_directory+'/stp_permission.txt'
+            with open(textfile_name) as f:
+                lines = f.readlines()
+            if len(lines) != 0:
+                permission = lines[0]
+            else:
+                permission=None
+            return permission
+        except IOError:
+            return None
+    elif secondary == True:
+        try:
+            local_directory = GetLocalDirectoryName()
+            textfile_name = local_directory+'/secondary_stp_permission.txt'
+            with open(textfile_name) as f:
+                lines = f.readlines()
+            if len(lines) != 0:
+                permission = lines[0]
+            else:
+                permission=None
+            return permission
+        except IOError:
+            return None
 
-def GetCurrentUSDLink():
+def GetCurrentUSDLink(secondary):
     try:
         local_directory = GetLocalDirectoryName()
         textfile_name = local_directory+'/usdlink.txt'
@@ -225,19 +282,33 @@ def GetCurrentUSDLink():
         print('[ERROR] USD link not found! Check whether you have inputted your USD link.')
 
 
-def GetCurrentUSDLinkNoPrint():
-    try:
-        local_directory = GetLocalDirectoryName()
-        textfile_name = local_directory+'/usdlink.txt'
-        with open(textfile_name) as f:
-            lines = f.readlines()
-        if len(lines) != 0:
-            usdlink = lines[0]
-        else:
-            usdlink=None
-        return usdlink
-    except IOError:
-        return None
+def GetCurrentUSDLinkNoPrint(secondary=False):
+    if secondary == False:
+        try:
+            local_directory = GetLocalDirectoryName()
+            textfile_name = local_directory+'/usdlink.txt'
+            with open(textfile_name) as f:
+                lines = f.readlines()
+            if len(lines) != 0:
+                usdlink = lines[0]
+            else:
+                usdlink=None
+            return usdlink
+        except IOError:
+            return None
+    else:
+        try:
+            local_directory = GetLocalDirectoryName()
+            textfile_name = local_directory+'/secondary_usdlink.txt'
+            with open(textfile_name) as f:
+                lines = f.readlines()
+            if len(lines) != 0:
+                usdlink = lines[0]
+            else:
+                usdlink=None
+            return usdlink
+        except IOError:
+            return None 
 
 def GetCurrentProjectLink():
     try:
@@ -283,19 +354,33 @@ def GetLastProjectLinkNoPrint():
     except IOError:
         return None
 
-def GetCurrentSTPLinkNoPrint():
-    try:
-        local_directory = GetLocalDirectoryName()
-        textfile_name = local_directory+'/stplink.txt'
-        with open(textfile_name) as f:
-            lines = f.readlines()
-        if len(lines) != 0:
-            stplink = lines[0]
-        else:
-            stplink=None
-        return stplink
-    except IOError:
-        return None
+def GetCurrentSTPLinkNoPrint(secondary=False):
+    if secondary == False:
+        try:
+            local_directory = GetLocalDirectoryName()
+            textfile_name = local_directory+'/stplink.txt'
+            with open(textfile_name) as f:
+                lines = f.readlines()
+            if len(lines) != 0:
+                usdlink = lines[0]
+            else:
+                usdlink=None
+            return usdlink
+        except IOError:
+            return None
+    else:
+        try:
+            local_directory = GetLocalDirectoryName()
+            textfile_name = local_directory+'/secondary_stplink.txt'
+            with open(textfile_name) as f:
+                lines = f.readlines()
+            if len(lines) != 0:
+                usdlink = lines[0]
+            else:
+                usdlink=None
+            return usdlink
+        except IOError:
+            return None
 
 
 def GetCurrentSelection():
@@ -313,7 +398,7 @@ def GetCurrentSelection():
         print("[ERROR] No object selected or multiple objects selected! Select a single object from the Model tree to push to Nucleus.")
         return None
 
-def GetAuthCheck(usdlink, filetype='usd'):
+def GetAuthCheck(usdlink, filetype='usd', secondary=False):
     batchfilepath = GetFetcherScriptsDirectory().replace(" ","` ")
     batchfilename = GetBatchFileName()
     batchfilepath = os.path.join(batchfilepath, batchfilename)
@@ -346,12 +431,19 @@ def GetAuthCheck(usdlink, filetype='usd'):
         permission='OK_ACCESS'
     else:
         permission = 'NO_ACCESS'
-    if filetype=='stp':
-        SaveSTPPermissionsAsTextFile(permission)
-    elif filetype=='usd':
-        SaveUSDPermissionsAsTextFile(permission)
-    elif filetype=='project':
-        SaveProjectPermissionsAsTextFile(permission)
+
+    if secondary== False:
+        if filetype=='stp':
+            SaveSTPPermissionsAsTextFile(permission)
+        elif filetype=='usd':
+            SaveUSDPermissionsAsTextFile(permission)
+        elif filetype=='project':
+            SaveProjectPermissionsAsTextFile(permission)
+    elif secondary ==True:
+        if filetype=='stp':
+            SaveSecondarySTPPermissionsAsTextFile(permission)
+        elif filetype=='usd':
+            SaveSecondaryUSDPermissionsAsTextFile(permission)
     print('[ERRORS]', stderr)
 
     return stdout, stderr, permission
@@ -410,11 +502,11 @@ def GetListOfUSDFiles():
         return None
 
 
-def UploadUSDToNucleus(usdlink, selected_object, token, existing_usd = True):
+def UploadUSDToNucleus(usdlink, selected_object, token, existing_usd = True, secondary = False):
     #TODO - WIP
     if existing_usd == True:
         # permission = 
-        permission = GetCurrentUSDPermissions()
+        permission = GetCurrentUSDPermissions(secondary=secondary)
         if permission =='NO_ACCESS':
             print('[ERROR] NO_PERMISSION: Cannot access USD file: '+ usdlink)
             print('[ERROR] You do not have permissions to access this file! Contact your Nucleus administrator.')
@@ -1703,10 +1795,147 @@ class OmniConnectionSettingsPanel:
         self.form.setLayout(layout)
 
     def show_about_page(self):
-        msgBox = QtGui.QMessageBox()
-        msgBox.setIcon(QtGui.QMessageBox.Information)
-        msgBox.setText("FreeCAD Omniverse Connector\nVersion 3.0.2 \n\u00A9 2024 The University of Manchester")
-        msgBox.exec_()
+        dialog = QtGui.QInputDialog(self.form)
+        # msgBox.setIcon(QtGui.QMessageBox.Information)
+        version_info = QtGui.QLabel("FreeCAD Omniverse Connector\nVersion 3.0.2 \n\u00A9 2024 The University of Manchester")
+        # msgBox.setText("FreeCAD Omniverse Connector\nVersion 3.0.2 \n\u00A9 2024 The University of Manchester")
+        dialog.show()
+        dialog.findChild(QtGui.QLineEdit).hide()
+        dialog.layout().itemAt(0).widget().hide()
+
+        dialog.layout().insertWidget(1, version_info)
+        # Remove the default buttons and add a custom "Advanced" button
+        button_box = dialog.findChild(QtGui.QDialogButtonBox)
+        button_box.clear()  # Clear existing buttons
+
+        # Create the Advanced button
+        advanced_button = QtGui.QPushButton("Advanced")
+        button_box.addButton(advanced_button, QtGui.QDialogButtonBox.ActionRole)
+
+        # Connect the Advanced button to the custom slot
+        advanced_button.clicked.connect(self.show_advanced_page)
+
+        dialog.exec_()
+
+    def show_advanced_page(self):
+        # Create a dialog for Advanced options
+        advanced_dialog = QtGui.QDialog()
+        advanced_dialog.setWindowTitle("Advanced Options")
+        layout = QtGui.QVBoxLayout(advanced_dialog)
+
+        # Main label
+        advanced_label = QtGui.QLabel("Secondary Nucleus Links")
+        layout.addWidget(advanced_label)
+
+        # USD link toggle and input
+        usd_toggle = QtGui.QCheckBox("Enable USD Link")
+        usd_link_label = QtGui.QLabel("Input USD link for Nucleus")
+        usd_link = QtGui.QLineEdit()
+        usd_warning_label = QtGui.QLabel("")
+        usd_warning_label.setStyleSheet("color: red;")  # Warning text in red
+        usd_warning_label.hide()
+
+        # Initialize USD link state
+        if 'is_enabled_secondary_usdlink' not in dir(FreeCAD):
+            FreeCAD.is_enabled_secondary_usdlink = False
+
+        if FreeCAD.is_enabled_secondary_usdlink:
+            usd_toggle.setChecked(True)
+            FreeCAD.secondary_usdlink = GetCurrentUSDLinkNoPrint(secondary=True)
+            usd_link.setText(FreeCAD.secondary_usdlink)
+            usd_link.setEnabled(True)
+        else:
+            usd_toggle.setChecked(False)
+            usd_link.setEnabled(False)
+
+        if GetCurrentUSDPermissions(secondary=True) != 'OK_ACCESS':
+            usd_warning_label.setText("Invalid access permissions to the USD link.")
+            usd_warning_label.show()
+
+        # Ensure the text field remains populated if the link exists
+        if hasattr(FreeCAD, 'secondary_usdlink') and FreeCAD.secondary_usdlink:
+            usd_link.setText(FreeCAD.secondary_usdlink)
+
+        usd_toggle.toggled.connect(lambda checked: usd_link.setEnabled(checked))
+        layout.addWidget(usd_toggle)
+        layout.addWidget(usd_link_label)
+        layout.addWidget(usd_link)
+        layout.addWidget(usd_warning_label)
+
+        # STEP link toggle and input
+        step_toggle = QtGui.QCheckBox("Enable STEP Link")
+        step_link_label = QtGui.QLabel("Input STEP link for Nucleus")
+        step_link = QtGui.QLineEdit()
+        step_warning_label = QtGui.QLabel("")
+        step_warning_label.setStyleSheet("color: red;")  # Warning text in red
+        step_warning_label.hide()
+
+        # Initialize STEP link state
+        if 'is_enabled_secondary_stplink' not in dir(FreeCAD):
+            FreeCAD.is_enabled_secondary_stplink = False
+
+        if FreeCAD.is_enabled_secondary_stplink:
+            step_toggle.setChecked(True)
+            FreeCAD.secondary_stplink = GetCurrentSTPLinkNoPrint(secondary=True)
+            step_link.setText(FreeCAD.secondary_stplink)
+            step_link.setEnabled(True)
+        else:
+            step_toggle.setChecked(False)
+            step_link.setEnabled(False)
+
+        if GetCurrentSTPPermissions(secondary=True) != 'OK_ACCESS':
+            step_warning_label.setText("Invalid access permissions to the STEP link.")
+            step_warning_label.show()
+
+        # Ensure the text field remains populated if the link exists
+        if hasattr(FreeCAD, 'secondary_stplink') and FreeCAD.secondary_stplink:
+            step_link.setText(FreeCAD.secondary_stplink)
+
+        step_toggle.toggled.connect(lambda checked: step_link.setEnabled(checked))
+        layout.addWidget(step_toggle)
+        layout.addWidget(step_link_label)
+        layout.addWidget(step_link)
+        layout.addWidget(step_warning_label)
+
+        # OK and Cancel buttons
+        button_box = QtGui.QDialogButtonBox(QtGui.QDialogButtonBox.Ok | QtGui.QDialogButtonBox.Cancel)
+        button_box.accepted.connect(advanced_dialog.accept)
+        button_box.rejected.connect(advanced_dialog.reject)
+        layout.addWidget(button_box)
+
+        # Show the dialog
+        if advanced_dialog.exec_() == QtGui.QDialog.Accepted:
+            # Handle USD link
+            if usd_toggle.isChecked():
+                secondary_usdlink = usd_link.text()
+                _, _, permission = GetAuthCheck(secondary_usdlink, filetype='usd', secondary=True)
+                if permission == 'OK_ACCESS':
+                    print(f"USD Secondary Link: {secondary_usdlink}")
+                    SaveSecondaryUSDLinkAsTextFile(secondary_usdlink)
+                    FreeCAD.is_enabled_secondary_usdlink = True
+                    FreeCAD.secondary_usdlink = secondary_usdlink
+                else:
+                    FreeCAD.is_enabled_secondary_usdlink = False
+                    FreeCAD.secondary_usdlink = secondary_usdlink
+            else:
+                FreeCAD.is_enabled_secondary_usdlink = False
+                FreeCAD.secondary_usdlink = secondary_usdlink
+
+            # Handle STEP link
+            if step_toggle.isChecked():
+                secondary_stplink = step_link.text()
+                _, _, permission = GetAuthCheck(secondary_stplink, filetype='stp', secondary=True)
+                if permission == 'OK_ACCESS':
+                    print(f"STP Secondary Link: {secondary_stplink}")
+                    SaveSecondarySTPLinkAsTextFile(secondary_stplink)
+                    FreeCAD.is_enabled_secondary_stplink = True
+                    FreeCAD.secondary_stplink = secondary_stplink
+                else:
+                    FreeCAD.is_enabled_secondary_stplink = False
+                    FreeCAD.secondary_stplink = secondary_stplink
+            else:
+                FreeCAD.is_enabled_secondary_stplink = False
+                FreeCAD.secondary_stplink = secondary_stplink
 
     def disconnect_from_project(self):
         if 'is_connected_to_nucleus_project' not in dir(FreeCAD):
