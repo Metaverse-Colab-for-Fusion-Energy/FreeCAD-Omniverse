@@ -266,7 +266,7 @@ def GetCurrentSTPPermissions(secondary=False):
         except IOError:
             return None
 
-def GetCurrentUSDLink(secondary):
+def GetCurrentUSDLink():
     try:
         local_directory = GetLocalDirectoryName()
         textfile_name = local_directory+'/usdlink.txt'
@@ -1079,6 +1079,7 @@ class _UploadCmd:
     
     def Activated(self):
         # what is done when the command is clicked
+
         selection =GetCurrentSelection()
         #TODO FIX THIS BIT = if usdlink from FreeCAd variable is different to the one from the directory
         if selection != None:
@@ -1154,6 +1155,17 @@ class _UploadCmd:
                     selection = attachNewStringProperty(selection, property_name = "Last_Nucleus_sync_time", property_value = current_time)
                     selection = attachNewStringProperty(selection, property_name = "Nucleus_link_stp", property_value = stplink)
                     selection = attachNewStringProperty(selection, property_name = "Nucleus_version_id", property_value = token)
+
+            if 'is_enabled_secondary_usdlink' in dir(FreeCAD):
+
+                if FreeCAD.is_enabled_secondary_usdlink == True:
+
+                    FreeCAD.secondary_usdlink = GetCurrentUSDLinkNoPrint(secondary=True)
+                    output, error = UploadUSDToNucleus(FreeCAD.secondary_usdlink, selection, token = token)
+                    output = output.split('\r\n')
+                    for line in output:
+                        print('OmniClient - ADV', line)
+                    print('ERRORS - ADV', error)
 
     def GetResources(self):
         # icon and command information
@@ -1919,7 +1931,7 @@ class OmniConnectionSettingsPanel:
                     FreeCAD.secondary_usdlink = secondary_usdlink
             else:
                 FreeCAD.is_enabled_secondary_usdlink = False
-                FreeCAD.secondary_usdlink = secondary_usdlink
+
 
             # Handle STEP link
             if step_toggle.isChecked():
@@ -1935,7 +1947,7 @@ class OmniConnectionSettingsPanel:
                     FreeCAD.secondary_stplink = secondary_stplink
             else:
                 FreeCAD.is_enabled_secondary_stplink = False
-                FreeCAD.secondary_stplink = secondary_stplink
+
 
     def disconnect_from_project(self):
         if 'is_connected_to_nucleus_project' not in dir(FreeCAD):
