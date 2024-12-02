@@ -179,7 +179,16 @@ def delete_project_link():
 
 def delete_asset_localdata():
     local_directory = GetLocalDirectoryName()
-    textfile_names = [str(local_directory)+'/usdlink.txt', str(local_directory)+'/usd_permission.txt', str(local_directory)+'/stplink.txt', str(local_directory)+'/stp_permission.txt']
+    textfile_names = [
+        str(local_directory)+'/usdlink.txt', 
+        str(local_directory)+'/usd_permission.txt', 
+        str(local_directory)+'/stplink.txt', 
+        str(local_directory)+'/stp_permission.txt', 
+        str(local_directory)+'/secondary_usd_permission.txt',
+        str(local_directory)+'/secondary_stp_permission.txt',
+        str(local_directory)+'/secondary_usdlink.txt',
+        str(local_directory)+'/secondary_stplink.txt',
+        ]
     
     for asset_data in textfile_names:
         try:
@@ -544,8 +553,52 @@ def UploadUSDToNucleus(usdlink, selected_object, token, existing_usd = True, sec
             # stderr = str(stderr)
     return stdout, stderr
 
+def DirectUploadUSDToNucleus(usdlink, selected_object, token, existing_usd = True, secondary = False):
+    #TODO - WIP
+    if existing_usd == True:
+        # permission = 
+        permission = GetCurrentUSDPermissions(secondary=secondary)
+        if permission =='NO_ACCESS':
+            print('[ERROR] NO_PERMISSION: Cannot access USD file: '+ usdlink)
+            print('[ERROR] You do not have permissions to access this file! Contact your Nucleus administrator.')
+            print('Try logging in under a different username: log out through the nucleus. SIGNOUT BUTTON IS WIP')
+            stdout='FAIL'
+            stderr='NO_PERMISSION'
+        elif permission is None:
+            print('[ERROR] PERMISSION_NOT_FOUND: Cannot access USD file: '+ usdlink)
+            print('[ERROR] You have not entered a valid USD link.')
+            stdout='FAIL'
+            stderr='PERMISSION_NOT_FOUND'
+        elif permission == 'OK_ACCESS': 
+        # Batch file where the OV USD uploader lives
+            batchfilepath = GetFetcherScriptsDirectory().replace(" ","` ")
+            batchfilename = GetBatchFileName()
+            batchfilepath = os.path.join(batchfilepath, batchfilename)
+            # local directory where copies are staged
+            local_STL_path = GetLocalDirectoryName()
+            print('local_STL_path', local_STL_path)
+            # A one-time token for fetching to make sure get the right file. This needs to be a random string
+            # token = str(RandomTokenGenerator())
+            print('Unique version identifier: '+token)
+            local_STL_filename = local_STL_path +  '/'+token+'upload.stl'
+            Mesh.export([selected_object], local_STL_filename)
 
-def UploadSTPToNucleus(stplink, selected_object, token, existing_stp = True, custom_checkpoint = None):
+            print('local_STL_filename', local_STL_filename)
+            # Parsing commands for the batchfile
+            cmd = batchfilepath + ' --nucleus_url' +' '+ usdlink + ' --local_directory '+ local_STL_path.replace(" ","` ") +' --create_new_usd' +" --token "+ token
+            print(cmd)
+            # Now running command to push to Nucleus
+            p = subprocess.Popen(['powershell', cmd], shell=True, stdout = subprocess.PIPE, stderr = subprocess.PIPE)
+            stdout, stderr = p.communicate()
+            stdout = stdout.decode('utf-8')
+            stderr = stderr.decode('utf-8')
+            # stdout = str(stdout)
+            # stderr = str(stderr)
+    return stdout, stderr
+
+
+
+def UploadSTPToNucleus(stplink, selected_object, token, existing_stp = True, custom_checkpoint = None, secondary = False):
     if existing_stp ==True:
         permission = GetCurrentSTPPermissions()
         if permission =='NO_ACCESS':
@@ -1071,6 +1124,7 @@ class _ClearJunkCmd:
         return not FreeCAD.ActiveDocument is None
 
 
+
 # GUI command that links the Python script
 class _UploadCmd:
     """Command to upload a selected component to nucleus"""
@@ -1161,11 +1215,11 @@ class _UploadCmd:
                 if FreeCAD.is_enabled_secondary_usdlink == True:
 
                     FreeCAD.secondary_usdlink = GetCurrentUSDLinkNoPrint(secondary=True)
-                    output, error = UploadUSDToNucleus(FreeCAD.secondary_usdlink, selection, token = token)
+                    output, error = DirectUploadUSDToNucleus(FreeCAD.secondary_usdlink, selection, token = token)
                     output = output.split('\r\n')
                     for line in output:
-                        print('OmniClient - ADV', line)
-                    print('ERRORS - ADV', error)
+                        print('OmniClient ', line)
+                    print('ERRORS ', error)
 
     def GetResources(self):
         # icon and command information
@@ -1833,19 +1887,28 @@ class OmniConnectionSettingsPanel:
         # Create a dialog for Advanced options
         advanced_dialog = QtGui.QDialog()
         advanced_dialog.setWindowTitle("Advanced Options")
-        layout = QtGui.QVBoxLayout(advanced_dialog)
+        main_layout = QtGui.QVBoxLayout(advanced_dialog)
 
         # Main label
-        advanced_label = QtGui.QLabel("Secondary Nucleus Links")
-        layout.addWidget(advanced_label)
+        advanced_label = QtGui.QLabel("Advanced Options")
+        main_layout.addWidget(advanced_label)
+
+        # Use a grid layout for alignment
+        grid_layout = QtGui.QGridLayout()
 
         # USD link toggle and input
-        usd_toggle = QtGui.QCheckBox("Enable USD Link")
-        usd_link_label = QtGui.QLabel("Input USD link for Nucleus")
+        usd_toggle = QtGui.QCheckBox("Enable direct USD push")
+        usd_link_label = QtGui.QLabel("Nucleus USD link:")
         usd_link = QtGui.QLineEdit()
         usd_warning_label = QtGui.QLabel("")
         usd_warning_label.setStyleSheet("color: red;")  # Warning text in red
         usd_warning_label.hide()
+
+        # Align USD components in the grid
+        grid_layout.addWidget(usd_toggle, 0, 0, 1, 1)  # Toggle in the first row, first column
+        grid_layout.addWidget(usd_link_label, 1, 1, 1, 1)  # Label in the second row, second column
+        grid_layout.addWidget(usd_link, 1, 2, 1, -1)  # Input field in the second row, spanning from the third column to the end
+        grid_layout.addWidget(usd_warning_label, 2, 1, 1, -1)  # Warning label in the third row, spanning from the second column to the end
 
         # Initialize USD link state
         if 'is_enabled_secondary_usdlink' not in dir(FreeCAD):
@@ -1869,19 +1932,27 @@ class OmniConnectionSettingsPanel:
             usd_link.setText(FreeCAD.secondary_usdlink)
 
         usd_toggle.toggled.connect(lambda checked: usd_link.setEnabled(checked))
-        layout.addWidget(usd_toggle)
-        layout.addWidget(usd_link_label)
-        layout.addWidget(usd_link)
-        layout.addWidget(usd_warning_label)
 
         # STEP link toggle and input
-        step_toggle = QtGui.QCheckBox("Enable STEP Link")
-        step_link_label = QtGui.QLabel("Input STEP link for Nucleus")
+        step_toggle = QtGui.QCheckBox("Enable direct STEP push")
+        step_link_label = QtGui.QLabel("Nucleus STEP link:")
         step_link = QtGui.QLineEdit()
         step_warning_label = QtGui.QLabel("")
         step_warning_label.setStyleSheet("color: red;")  # Warning text in red
         step_warning_label.hide()
 
+        # # Align STEP components in the grid
+        # grid_layout.addWidget(step_toggle, 3, 0, 1, 1)  # Toggle in the fourth row, first column
+        # grid_layout.addWidget(step_link_label, 4, 1, 1, 1)  # Label in the fifth row, second column
+        # grid_layout.addWidget(step_link, 4, 2, 1, -1)  # Input field in the fifth row, spanning from the third column to the end
+        # grid_layout.addWidget(step_warning_label, 5, 1, 1, -1)  # Warning label in the sixth row, spanning from the second column to the end
+
+        # # Uncomment if STEP permissions are checked
+        # if GetCurrentSTPPermissions(secondary=True) != 'OK_ACCESS':
+        #     step_warning_label.setText("Invalid access permissions to the STEP link.")
+        #     step_warning_label.show()
+
+        # step_toggle.toggled.connect(lambda checked: step_link.setEnabled(checked))
         # Initialize STEP link state
         if 'is_enabled_secondary_stplink' not in dir(FreeCAD):
             FreeCAD.is_enabled_secondary_stplink = False
@@ -1895,25 +1966,25 @@ class OmniConnectionSettingsPanel:
             step_toggle.setChecked(False)
             step_link.setEnabled(False)
 
-        if GetCurrentSTPPermissions(secondary=True) != 'OK_ACCESS':
-            step_warning_label.setText("Invalid access permissions to the STEP link.")
-            step_warning_label.show()
-
         # Ensure the text field remains populated if the link exists
         if hasattr(FreeCAD, 'secondary_stplink') and FreeCAD.secondary_stplink:
             step_link.setText(FreeCAD.secondary_stplink)
 
-        step_toggle.toggled.connect(lambda checked: step_link.setEnabled(checked))
-        layout.addWidget(step_toggle)
-        layout.addWidget(step_link_label)
-        layout.addWidget(step_link)
-        layout.addWidget(step_warning_label)
+        # Uncomment if STEP permissions are checked
+        # if GetCurrentSTPPermissions(secondary=True) != 'OK_ACCESS':
+        #     step_warning_label.setText("Invalid access permissions to the STEP link.")
+        #     step_warning_label.show()
+
+        # step_toggle.toggled.connect(lambda checked: step_link.setEnabled(checked))
+
+        # Add the grid layout to the main layout
+        main_layout.addLayout(grid_layout)
 
         # OK and Cancel buttons
         button_box = QtGui.QDialogButtonBox(QtGui.QDialogButtonBox.Ok | QtGui.QDialogButtonBox.Cancel)
         button_box.accepted.connect(advanced_dialog.accept)
         button_box.rejected.connect(advanced_dialog.reject)
-        layout.addWidget(button_box)
+        main_layout.addWidget(button_box)
 
         # Show the dialog
         if advanced_dialog.exec_() == QtGui.QDialog.Accepted:
@@ -1931,7 +2002,6 @@ class OmniConnectionSettingsPanel:
                     FreeCAD.secondary_usdlink = secondary_usdlink
             else:
                 FreeCAD.is_enabled_secondary_usdlink = False
-
 
             # Handle STEP link
             if step_toggle.isChecked():

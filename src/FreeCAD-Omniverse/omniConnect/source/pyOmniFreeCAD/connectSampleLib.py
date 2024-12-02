@@ -1273,7 +1273,9 @@ if __name__ == "__main__":
 ### FUNCTION TO CREATE NEW USD
     elif nucleus_url and create_new_usd==True:
         nucleus_url = createOmniverseModel(nucleus_url, live_edit=False)
-        prim_name = 'testMesh'
+
+        usd_filename=splitURLGetUSDFileName(nucleus_url)
+        prim_name = strip_suffixes(usd_filename)
         if token is not None:
             meshPrim = createEmptyMeshPrim(nucleus_url, prim_name, token = token)
         else:
