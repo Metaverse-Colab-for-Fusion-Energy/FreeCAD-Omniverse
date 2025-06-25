@@ -24,7 +24,6 @@
 #*                                                                         *
 #***************************************************************************/
 
-
 from PySide import QtCore, QtGui
 import FreeCAD
 import FreeCADGui
@@ -42,370 +41,11 @@ import ast
 import asyncio
 import datetime
 import threading
-
+from utils import *
+from file_utils import *
 __dir__ = os.path.dirname(__file__)
 
 ### BACKEND FUNCTIONS
-# FreeCAD Command made with a Python script
-def GetFetcherScriptsDirectory():
-    workbench_path = os.path.dirname(os.path.realpath(__file__))
-    omni_directory = os.path.join(workbench_path, 'omniConnect')
-    # omni_directory = workbench_path + '/omniConnect'
-    return omni_directory
-
-def GetLocalDirectoryName():
-    workbench_path = os.path.dirname(os.path.realpath(__file__))
-    local_directory = os.path.join(workbench_path, 'session_local')
-    if not os.path.exists(local_directory):
-        os.makedirs(local_directory)
-    return local_directory
-
-def GetBatchFileName(live=False):
-    if live == False:
-        batchfilename = "run_py_omni_client.bat"
-    else:
-        batchfilename = 'run_py_omni_live_client.bat'
-    return batchfilename
-
-def ClearLocalDirectory():
-    folder = GetLocalDirectoryName()
-    for filename in os.listdir(folder):
-        file_path = os.path.join(folder, filename)
-        try:
-            if os.path.isfile(file_path) or os.path.islink(file_path):
-                os.unlink(file_path)
-            elif os.path.isdir(file_path):
-                shutil.rmtree(file_path)
-        except Exception as e:
-            print('[ERROR] Failed to delete %s. Reason: %s' % (file_path, e))
-
-def RandomTokenGenerator():
-    characters = string.ascii_letters + string.digits  # letters and numbers
-    token = ''.join(random.choices(characters, k=5))
-    return token
-
-def SaveUSDLinkAsTextFile(usdlink):
-    local_directory = GetLocalDirectoryName()
-    FreeCAD.OV_link_usd = clean_omniverse_path(str(usdlink))
-    textfile_name = local_directory+'/usdlink.txt'
-    with open(textfile_name, 'w') as f:
-        f.write(usdlink)
-
-
-def SaveSecondaryUSDLinkAsTextFile(usdlink):
-    local_directory = GetLocalDirectoryName()
-    FreeCAD.OV_link_usd = clean_omniverse_path(str(usdlink))
-    textfile_name = local_directory+'/secondary_usdlink.txt'
-    with open(textfile_name, 'w') as f:
-        f.write(usdlink)
-
-def SaveLastProjectLinkAsTextFile(usdlink):
-    local_directory = GetLocalDirectoryName()
-    FreeCAD.OV_link_project= clean_omniverse_path(str(usdlink))
-    textfile_name = local_directory+'/last_projectlink.txt'
-    with open(textfile_name, 'w') as f:
-        f.write(usdlink)
-
-
-def SaveProjectLinkAsTextFile(usdlink):
-    local_directory = GetLocalDirectoryName()
-    FreeCAD.OV_link_project= clean_omniverse_path(str(usdlink))
-    textfile_name = local_directory+'/projectlink.txt'
-    with open(textfile_name, 'w') as f:
-        f.write(usdlink)
-
-def SaveSTPLinkAsTextFile(stplink):
-    local_directory = GetLocalDirectoryName()
-    FreeCAD.OV_link_stp = clean_omniverse_path(str(stplink))
-    textfile_name = local_directory+'/stplink.txt'
-    with open(textfile_name, 'w') as f:
-        f.write(stplink)
-
-def SaveSecondarySTPLinkAsTextFile(stplink):
-    local_directory = GetLocalDirectoryName()
-    FreeCAD.OV_link_stp = clean_omniverse_path(str(stplink))
-    textfile_name = local_directory+'/secondary_stplink.txt'
-    with open(textfile_name, 'w') as f:
-        f.write(stplink)
-
-
-def SaveUSDPermissionsAsTextFile(permission):
-    local_directory = GetLocalDirectoryName()
-    FreeCAD.OV_permission_usd =permission
-    textfile_name = local_directory+'/usd_permission.txt'
-    with open(textfile_name, 'w') as f:
-        f.write(permission)
-
-def SaveSecondaryUSDPermissionsAsTextFile(permission):
-    local_directory = GetLocalDirectoryName()
-    FreeCAD.OV_permission_usd =permission
-    textfile_name = local_directory+'/secondary_usd_permission.txt'
-    with open(textfile_name, 'w') as f:
-        f.write(permission)
-def SaveProjectPermissionsAsTextFile(permission):
-    local_directory = GetLocalDirectoryName()
-    FreeCAD.OV_permission_project =permission
-    textfile_name = local_directory+'/project_permission.txt'
-    with open(textfile_name, 'w') as f:
-        f.write(permission)
-
-def SaveSTPPermissionsAsTextFile(permission):
-    local_directory = GetLocalDirectoryName()
-    FreeCAD.OV_permission_stp =permission
-    textfile_name = local_directory+'/stp_permission.txt'
-    with open(textfile_name, 'w') as f:
-        f.write(permission)
-
-def SaveSecondarySTPPermissionsAsTextFile(permission):
-    local_directory = GetLocalDirectoryName()
-    FreeCAD.OV_permission_stp =permission
-    textfile_name = local_directory+'/secondary_stp_permission.txt'
-    with open(textfile_name, 'w') as f:
-        f.write(permission)
-
-def delete_project_link():
-    local_directory = GetLocalDirectoryName()
-    textfile_name = local_directory+'/projectlink.txt'
-    try:
-        os.remove(textfile_name)
-    except FileNotFoundError:
-        # print(f"The file '{textfile_name}' does not exist.")
-        pass
-    except PermissionError:
-        # print(f"Permission denied. Unable to delete the file '{textfile_name}'.")
-        pass
-    except Exception as e:
-        print(f"An error occurred while deleting the file '{textfile_name}': {str(e)}")
-
-def delete_asset_localdata():
-    local_directory = GetLocalDirectoryName()
-    textfile_names = [
-        str(local_directory)+'/usdlink.txt', 
-        str(local_directory)+'/usd_permission.txt', 
-        str(local_directory)+'/stplink.txt', 
-        str(local_directory)+'/stp_permission.txt', 
-        str(local_directory)+'/secondary_usd_permission.txt',
-        str(local_directory)+'/secondary_stp_permission.txt',
-        str(local_directory)+'/secondary_usdlink.txt',
-        str(local_directory)+'/secondary_stplink.txt',
-        ]
-    
-    for asset_data in textfile_names:
-        try:
-            os.remove(asset_data)
-        except FileNotFoundError:
-            # print(f"The file '{asset_data}' does not exist.")
-            pass
-        except PermissionError:
-            # print(f"Permission denied. Unable to delete the file '{asset_data}'.")
-            pass
-        except Exception as e:
-            print(f"An error occurred while deleting the file '{asset_data}': {str(e)}")
-
-
-
-
-def GetCurrentUSDPermissions(secondary=False):
-    if secondary==False:
-        try:
-            local_directory = GetLocalDirectoryName()
-            textfile_name = local_directory+'/usd_permission.txt'
-            with open(textfile_name) as f:
-                lines = f.readlines()
-            if len(lines) != 0:
-                permission = lines[0]
-            else:
-                permission=None
-            return permission
-        except IOError:
-            return None
-    elif secondary == True:
-        try:
-            local_directory = GetLocalDirectoryName()
-            textfile_name = local_directory+'/secondary_usd_permission.txt'
-            with open(textfile_name) as f:
-                lines = f.readlines()
-            if len(lines) != 0:
-                permission = lines[0]
-            else:
-                permission=None
-            return permission
-        except IOError:
-            return None
-
-def GetCurrentProjectPermissions():
-    try:
-        local_directory = GetLocalDirectoryName()
-        textfile_name = local_directory+'/project_permission.txt'
-        with open(textfile_name) as f:
-            lines = f.readlines()
-        if len(lines) != 0:
-            permission = lines[0]
-        else:
-            permission=None
-        return permission
-    except IOError:
-        return None
-
-def GetCurrentSTPPermissions(secondary=False):
-    if secondary==False:
-        try:
-            local_directory = GetLocalDirectoryName()
-            textfile_name = local_directory+'/stp_permission.txt'
-            with open(textfile_name) as f:
-                lines = f.readlines()
-            if len(lines) != 0:
-                permission = lines[0]
-            else:
-                permission=None
-            return permission
-        except IOError:
-            return None
-    elif secondary == True:
-        try:
-            local_directory = GetLocalDirectoryName()
-            textfile_name = local_directory+'/secondary_stp_permission.txt'
-            with open(textfile_name) as f:
-                lines = f.readlines()
-            if len(lines) != 0:
-                permission = lines[0]
-            else:
-                permission=None
-            return permission
-        except IOError:
-            return None
-
-def GetCurrentUSDLink():
-    try:
-        local_directory = GetLocalDirectoryName()
-        textfile_name = local_directory+'/usdlink.txt'
-        with open(textfile_name) as f:
-            lines = f.readlines()
-        if len(lines) != 0:
-            usdlink = lines[0]
-        else:
-            usdlink=None
-            print('[ERROR] No USD link specified! Check whether you have inputted your USD link.')
-        return usdlink
-    except IOError:
-        print('[ERROR] USD link not found! Check whether you have inputted your USD link.')
-
-
-def GetCurrentUSDLinkNoPrint(secondary=False):
-    if secondary == False:
-        try:
-            local_directory = GetLocalDirectoryName()
-            textfile_name = local_directory+'/usdlink.txt'
-            with open(textfile_name) as f:
-                lines = f.readlines()
-            if len(lines) != 0:
-                usdlink = lines[0]
-            else:
-                usdlink=None
-            return usdlink
-        except IOError:
-            return None
-    else:
-        try:
-            local_directory = GetLocalDirectoryName()
-            textfile_name = local_directory+'/secondary_usdlink.txt'
-            with open(textfile_name) as f:
-                lines = f.readlines()
-            if len(lines) != 0:
-                usdlink = lines[0]
-            else:
-                usdlink=None
-            return usdlink
-        except IOError:
-            return None 
-
-def GetCurrentProjectLink():
-    try:
-        local_directory = GetLocalDirectoryName()
-        textfile_name = local_directory+'/projectlink.txt'
-        with open(textfile_name) as f:
-            lines = f.readlines()
-        if len(lines) != 0:
-            usdlink = lines[0]
-        else:
-            usdlink=None
-            print('[ERROR] No USD link specified! Check whether you have inputted your USD link.')
-        return usdlink
-    except IOError:
-        print('[ERROR] USD link not found! Check whether you have inputted your USD link.')
-
-
-def GetCurrentProjectLinkNoPrint():
-    try:
-        local_directory = GetLocalDirectoryName()
-        textfile_name = local_directory+'/projectlink.txt'
-        with open(textfile_name) as f:
-            lines = f.readlines()
-        if len(lines) != 0:
-            usdlink = lines[0]
-        else:
-            usdlink=None
-        return usdlink
-    except IOError:
-        return None
-
-def GetLastProjectLinkNoPrint():
-    try:
-        local_directory = GetLocalDirectoryName()
-        textfile_name = local_directory+'/last_projectlink.txt'
-        with open(textfile_name) as f:
-            lines = f.readlines()
-        if len(lines) != 0:
-            usdlink = lines[0]
-        else:
-            usdlink=None
-        return usdlink
-    except IOError:
-        return None
-
-def GetCurrentSTPLinkNoPrint(secondary=False):
-    if secondary == False:
-        try:
-            local_directory = GetLocalDirectoryName()
-            textfile_name = local_directory+'/stplink.txt'
-            with open(textfile_name) as f:
-                lines = f.readlines()
-            if len(lines) != 0:
-                usdlink = lines[0]
-            else:
-                usdlink=None
-            return usdlink
-        except IOError:
-            return None
-    else:
-        try:
-            local_directory = GetLocalDirectoryName()
-            textfile_name = local_directory+'/secondary_stplink.txt'
-            with open(textfile_name) as f:
-                lines = f.readlines()
-            if len(lines) != 0:
-                usdlink = lines[0]
-            else:
-                usdlink=None
-            return usdlink
-        except IOError:
-            return None
-
-
-def GetCurrentSelection():
-    selection = FreeCADGui.Selection.getSelection()
-    # Check the number of selected objects
-    if str(selection) =='[<App::Origin object>]':
-        print('[ERROR] Origin object selected. Select a valid mesh, part, or body object to push to Nucleus.')
-        return None
-    if len(selection) == 1:
-        # Access the selected object
-        selected_object = selection[0]
-        print("Selected object:", selected_object.Name)
-        return selected_object
-    else:
-        print("[ERROR] No object selected or multiple objects selected! Select a single object from the Model tree to push to Nucleus.")
-        return None
 
 def GetAuthCheck(usdlink, filetype='usd', secondary=False):
     batchfilepath = GetFetcherScriptsDirectory().replace(" ","` ")
@@ -476,45 +116,8 @@ def FindUSDandSTPFiles(usdlink):
     print('ERRORS: '+ stderr)
     return stdout, stderr
 
-def GetListOfSTPFiles():
-    try:
-        local_directory = GetLocalDirectoryName()
-        textfile_name = local_directory+'/stplist.txt'
-        stp_url_list = []
-        with open(textfile_name) as f:
-            lines = f.readlines()
-        if len(lines) != 0:
-            for entry in lines:
-                stp_url_list.append(entry)
-        else:
-            stp_url_list=None
-        FreeCAD.OV_link_list_stp = stp_url_list
-        return stp_url_list
-    except IOError:
-        return None
-
-def GetListOfUSDFiles():
-    try:
-        local_directory = GetLocalDirectoryName()
-        textfile_name = local_directory+'/usdlist.txt'
-        usd_url_list = []
-        with open(textfile_name) as f:
-            lines = f.readlines()
-        if len(lines) != 0:
-            for entry in lines:
-                usd_url_list.append(entry)
-        else:
-            usd_url_list=None
-        FreeCAD.OV_link_list_usd = usd_url_list
-        return usd_url_list
-    except IOError:
-        return None
-
-
 def UploadUSDToNucleus(usdlink, selected_object, token, existing_usd = True, secondary = False):
-    #TODO - WIP
     if existing_usd == True:
-        # permission = 
         permission = GetCurrentUSDPermissions(secondary=secondary)
         if permission =='NO_ACCESS':
             print('[ERROR] NO_PERMISSION: Cannot access USD file: '+ usdlink)
@@ -528,35 +131,25 @@ def UploadUSDToNucleus(usdlink, selected_object, token, existing_usd = True, sec
             stdout='FAIL'
             stderr='PERMISSION_NOT_FOUND'
         elif permission == 'OK_ACCESS': 
-        # Batch file where the OV USD uploader lives
             batchfilepath = GetFetcherScriptsDirectory().replace(" ","` ")
             batchfilename = GetBatchFileName()
             batchfilepath = os.path.join(batchfilepath, batchfilename)
-            # local directory where copies are staged
             local_STL_path = GetLocalDirectoryName()
             print('local_STL_path', local_STL_path)
-            # A one-time token for fetching to make sure get the right file. This needs to be a random string
-            # token = str(RandomTokenGenerator())
             print('Unique version identifier: '+token)
             local_STL_filename = local_STL_path +  '/'+token+'upload.stl'
             Mesh.export([selected_object], local_STL_filename)
             print('local_STL_filename', local_STL_filename)
-            # Parsing commands for the batchfile
             cmd = batchfilepath + ' --nucleus_url' +' '+ usdlink + ' --local_directory '+ local_STL_path.replace(" ","` ") +' --push' +" --token "+ token
             print(cmd)
-            # Now running command to push to Nucleus
             p = subprocess.Popen(['powershell', cmd], shell=True, stdout = subprocess.PIPE, stderr = subprocess.PIPE)
             stdout, stderr = p.communicate()
             stdout = stdout.decode('utf-8')
             stderr = stderr.decode('utf-8')
-            # stdout = str(stdout)
-            # stderr = str(stderr)
     return stdout, stderr
 
 def DirectUploadUSDToNucleus(usdlink, selected_object, token, existing_usd = True, secondary = False):
-    #TODO - WIP
     if existing_usd == True:
-        # permission = 
         permission = GetCurrentUSDPermissions(secondary=secondary)
         if permission =='NO_ACCESS':
             print('[ERROR] NO_PERMISSION: Cannot access USD file: '+ usdlink)
@@ -570,33 +163,22 @@ def DirectUploadUSDToNucleus(usdlink, selected_object, token, existing_usd = Tru
             stdout='FAIL'
             stderr='PERMISSION_NOT_FOUND'
         elif permission == 'OK_ACCESS': 
-        # Batch file where the OV USD uploader lives
             batchfilepath = GetFetcherScriptsDirectory().replace(" ","` ")
             batchfilename = GetBatchFileName()
             batchfilepath = os.path.join(batchfilepath, batchfilename)
-            # local directory where copies are staged
             local_STL_path = GetLocalDirectoryName()
             print('local_STL_path', local_STL_path)
-            # A one-time token for fetching to make sure get the right file. This needs to be a random string
-            # token = str(RandomTokenGenerator())
             print('Unique version identifier: '+token)
             local_STL_filename = local_STL_path +  '/'+token+'upload.stl'
             Mesh.export([selected_object], local_STL_filename)
-
             print('local_STL_filename', local_STL_filename)
-            # Parsing commands for the batchfile
             cmd = batchfilepath + ' --nucleus_url' +' '+ usdlink + ' --local_directory '+ local_STL_path.replace(" ","` ") +' --create_new_usd' +" --token "+ token
             print(cmd)
-            # Now running command to push to Nucleus
             p = subprocess.Popen(['powershell', cmd], shell=True, stdout = subprocess.PIPE, stderr = subprocess.PIPE)
             stdout, stderr = p.communicate()
             stdout = stdout.decode('utf-8')
             stderr = stderr.decode('utf-8')
-            # stdout = str(stdout)
-            # stderr = str(stderr)
     return stdout, stderr
-
-
 
 def UploadSTPToNucleus(stplink, selected_object, token, existing_stp = True, custom_checkpoint = None, secondary = False):
     if existing_stp ==True:
@@ -617,31 +199,20 @@ def UploadSTPToNucleus(stplink, selected_object, token, existing_stp = True, cus
             batchfilepath = GetFetcherScriptsDirectory().replace(" ","` ")
             batchfilename = GetBatchFileName()
             batchfilepath = os.path.join(batchfilepath, batchfilename)
-            # local directory where copies are staged
             local_directory = GetLocalDirectoryName()
-            # A one-time token for fetching to make sure get the right file. This needs to be a random string
-            # token = str(RandomTokenGenerator())
             print('Unique version identifier: '+token)
-            # local_STP_filepath = local_directory +  '/'+token+'upload.stp'
             local_STP_filepath = os.path.join(local_directory, token+'upload.stp')
             ImportGui.export([selected_object], local_STP_filepath)
-            # selected_object.Label2 = str([stplink, token])
-            # Parsing commands for the batchfile
             cmd = batchfilepath + ' --nucleus_url' +' '+ stplink + ' --local_non_usd_filename '+ local_STP_filepath.replace(" ","` ") +' --push_non_usd' +" --token "+ token
             if custom_checkpoint != None:
                 custom_checkpoint = '\"'+ custom_checkpoint + '\"'
                 cmd = cmd + ' --custom_checkpoint ' + str(custom_checkpoint)
             print(cmd)
-            # Now running command to push to Nucleus
             p = subprocess.Popen(['powershell', cmd], shell=True, stdout = subprocess.PIPE, stderr = subprocess.PIPE)
             stdout, stderr = p.communicate()
             stdout = stdout.decode('utf-8')
             stderr = stderr.decode('utf-8')
-            # stdout = str(stdout)
-            # stderr = str(stderr)
     return stdout, stderr
-
-
 
 def DownloadUSDFromNucleus(usdlink):
     # Deprecated function. USDs are now not downloaded from Nucleus
@@ -656,43 +227,24 @@ def DownloadUSDFromNucleus(usdlink):
         print('[ERROR] You have not entered a valid USD link.')
     elif permission == 'OK_ACCESS':        
         doc = FreeCAD.ActiveDocument
-        # Batch file where the OV USD fetcher lives
         batchfilepath = GetFetcherScriptsDirectory().replace(" ","` ")
         batchfilename = GetBatchFileName()
         batchfilepath = os.path.join(batchfilepath, batchfilename)
-        # local directory where copies are staged
         local_STL_path = GetLocalDirectoryName()
-        # A one-time token for fetching to make sure get the right file. This needs to be a random string
         token = str(RandomTokenGenerator())
         print('Unique version identifier: '+token)
-        # Parsing commands for the batchfile
         cmd = batchfilepath  + ' --nucleus_url' +' '+ usdlink + ' --local_directory '+ local_STL_path.replace(" ","` ") +' --pull' + " --token "+ token
         print(cmd)
         p = subprocess.Popen(['powershell', cmd], shell=True, stdout = subprocess.PIPE, stderr = subprocess.PIPE)
         stdout, stderr = p.communicate()
         stdout = stdout.decode('utf-8')
         stderr = stderr.decode('utf-8')
-
-
-        # Now reading what has just been downloaded - token in below
         local_STL_filename = local_STL_path +  '/'+token+'download.stl'
         if os.path.exists(local_STL_filename):
             Mesh.insert(local_STL_filename)
         else:
             print('[ERROR] DLOAD_FAIL: USD download failed!')
     return stdout, stderr
-
-def check_file_isempty(file_path):
-    #Checks whether a file is empty or not. Used for dealing with placeholder files
-    expected_content = b'EMPTY_FILE'
-    try:
-        with open(file_path, 'rb') as file:
-            content = file.read()
-            # print(content)
-            return content == expected_content
-    except FileNotFoundError:
-        print(f"File not found: {file_path}")
-        return False
 
 def DownloadSTPFromNucleus(stplink, token, custom_checkpoint = None):
     # Downloads a step file hosted on nucleus
@@ -713,18 +265,12 @@ def DownloadSTPFromNucleus(stplink, token, custom_checkpoint = None):
         FreeCAD.setActiveDocument(doc.Name)
         current_instances = set(doc.findObjects())
         fc_err = None
-        # Batch file where the OV USD fetcher lives
         batchfilepath = GetFetcherScriptsDirectory().replace(" ","` ")
         batchfilename = GetBatchFileName()
         batchfilepath = os.path.join(batchfilepath, batchfilename)
-        # local directory where copies are staged
         local_directory_path = GetLocalDirectoryName()
-        # A one-time token for fetching to make sure get the right file. This needs to be a random string
         print('Unique version identifier: '+token)
-
-        # local_STP_filepath = local_directory_path +'/'+token+'download.stp'
         local_STP_filepath = os.path.join(local_directory_path, token+'download.stp')
-        # Parsing commands for the batchfile
         cmd = batchfilepath  + ' --nucleus_url '+ stplink + ' --pull_non_usd ' + " --local_non_usd_filename "+ local_STP_filepath.replace(" ","` ") + " --token " + token
         if custom_checkpoint != None:
             custom_checkpoint = '\"'+ custom_checkpoint + '\"'
@@ -734,9 +280,6 @@ def DownloadSTPFromNucleus(stplink, token, custom_checkpoint = None):
         stdout, stderr = p.communicate()
         stdout = stdout.decode('utf-8')
         stderr = stderr.decode('utf-8')
-
-        # Now reading what has just been downloaded - token in below
-        
         if os.path.exists(local_STP_filepath):
             if check_file_isempty(local_STP_filepath)==False:
                 imported_object = ImportGui.insert(local_STP_filepath, doc.Name, useLinkGroup=True, merge = False)
@@ -774,18 +317,14 @@ def CreateNewProjectOnNucleus(host_name, project_name, make_public=False):
     stderr = stderr.split('\n')        
     return ok, stdout, stderr
 
-
 def CreateNewAssemblyOnNucleus(projectURL, assembly_name = None, assembly_items_usd_links=None, assembly_items_stp_links=None, token=None):
     #a wrapper function for create new assembly
     batchfilepath = GetFetcherScriptsDirectory().replace(" ","` ")
     batchfilename = GetBatchFileName()
     batchfilepath = os.path.join(batchfilepath, batchfilename)
-
     assembly_usd_link = None
-
     if assembly_name == None:
         assembly_name = 'assembly'
-
     if assembly_items_usd_links!=None and assembly_items_stp_links!=None:
         str_assembly_items_usd = ' '.join(assembly_items_usd_links)
         str_assembly_items_stp = ' '.join(assembly_items_stp_links)
@@ -806,7 +345,6 @@ def CreateNewAssemblyOnNucleus(projectURL, assembly_name = None, assembly_items_
         line = line.strip()
         if '.usd' and str(projectURL+'/assembly') in line:
             assembly_usd_link = line
-
     return stdout, stderr, assembly_usd_link
 
 def AddCheckpointToUSDOnNucleus(usd_url, custom_checkpoint, token=None):
@@ -814,7 +352,6 @@ def AddCheckpointToUSDOnNucleus(usd_url, custom_checkpoint, token=None):
     batchfilename = GetBatchFileName()
     batchfilepath = os.path.join(batchfilepath, batchfilename)
     custom_checkpoint = '\"'+ custom_checkpoint + '\"'
-
     cmd = batchfilepath + ' --nucleus_url ' + str(usd_url) + ' --add_checkpoint_to_usd '
     if token!=None:
         cmd = cmd + ' --token ' + str(token) + ' --custom_checkpoint ' + custom_checkpoint
@@ -876,7 +413,6 @@ def GetPrimReferenceXForms(assemblyURL, token = None):
     stdout, stderr = p.communicate()
     stdout = stdout.decode('utf-8')
     stderr = stderr.decode('utf-8')
-    # print(stdout[-1])
     stdout = stdout.split('\n')
     stderr = stderr.split('\n')
     prim_data =[]
@@ -900,7 +436,6 @@ def GetPrimReferenceXForms(assemblyURL, token = None):
         primdata = None
 
     return stdout, stderr, prim_data
-
 
 def CreateNewAssetOnNucleus(asset_name, use_url = True, projectURL=None, host_name=None, project_name=None, token=None):
     batchfilepath = GetFetcherScriptsDirectory().replace(" ","` ")
@@ -949,16 +484,6 @@ def attachNewStringProperty(selection, property_name, property_value):
     exec("selection.setEditorMode('"+str(property_name)+"', 1)")
     return selection
 
-def getStringPropertyValue(selection, property_name):
-    object_property_list = selection.PropertiesList
-    if property_name in object_property_list:
-        # exec('value = selection.'+str(property_name))
-        # exec("value = selection."+property_name)
-        # exec('value = selection.Nucleus_link_usd')
-        return selection, exec('selection.'+str(property_name))
-    else:
-        return selection, None
-
 def get_assembly_component_placement(type='base'):
     # func to get list of valid (already uploaded to OV) assembly components position and rotation
     doc = FreeCAD.ActiveDocument
@@ -970,39 +495,18 @@ def get_assembly_component_placement(type='base'):
     component_usd_links = [obj.Nucleus_link_usd  for obj in valid_freecad_objects]
     return component_usd_links, placement
 
-def parse_list_into_set_srt_command_arg(input_list):
-    fixed_list = []
-    for group in input_list:
-        for item in group:
-            str_item = str(item)
-            if item < 0:
-                str_item = 'min'+ str_item[1:]
-            fixed_list.append(str_item)
+def GetListOfAssemblyObjects(projectURL):
+    doc = FreeCAD.ActiveDocument
+    object_list = []
+    object_label_list = []
+    for obj in doc.Objects:
+        if 'Nucleus_link_usd' in dir(obj):
+            if clean_omniverse_path(projectURL) in str(obj.Nucleus_link_usd):
+                object_list.append(obj)
+                object_label_list.append(obj.Label)
+    return object_list, object_label_list
 
-    input_list_str = str(fixed_list)
-    no_brackets = input_list_str.replace("]", " ").replace("[", " ")
-    no_parentheses = no_brackets.replace(")", " ").replace("(", " ")
-    return no_parentheses
-
-
-def strip_suffixes(item):
-    return re.sub(r'\.(usd|usda|usdc|usdz|stp|step)$', '', item, flags=re.IGNORECASE)
-
-
-def find_corresponding_element(selected_item, first_list, second_list):
-    for first_item, second_item in zip(first_list, second_list):
-        if strip_suffixes(selected_item) == strip_suffixes(second_item):
-            return second_item
-
-def get_full_link_from_short(selected_item, first_list, second_list):
-    for first_item, second_item in zip(first_list, second_list):
-        if selected_item in second_item:
-            return second_item
-
-
-### FRONTEND FUNCTIONS - MAPPING BUTTONS WIDGETS ETC TO REAL FUNCTIONS
-
-
+### FRONTEND FUNCTIONS
 def _DownloadCmdWrapper(stplink, usdlink, token, custom_checkpoint=None):
 
     if stplink is not None:
@@ -1014,7 +518,6 @@ def _DownloadCmdWrapper(stplink, usdlink, token, custom_checkpoint=None):
             print('OmniClient:', line)
         print('ERRORS', error)
         component_label = GetComponentNameFromStplink(stplink)
-
         imported_object = attachNewStringProperty(imported_object, property_name = "Label", property_value = component_label)
         imported_object = attachNewStringProperty(imported_object, property_name = "Nucleus_link_stp", property_value = stplink)
         imported_object = attachNewStringProperty(imported_object, property_name = "Nucleus_link_usd", property_value = usdlink)
@@ -1023,14 +526,12 @@ def _DownloadCmdWrapper(stplink, usdlink, token, custom_checkpoint=None):
         current_time = time.strftime(" %d %b  %Y %H:%M:%S", t)
         imported_object = attachNewStringProperty(imported_object, property_name = "Last_Nucleus_sync_time", property_value = current_time)       
         return imported_object
+
 class _DownloadCmd:
     """Command to download from nucleus"""
     def Activated(self):
         # what is done when the command is clicked
         token = str(RandomTokenGenerator())
-        # usdlink = getStringPropertyValue(selection, 'Nucleus_link_usd')
-        # stplink = getStringPropertyValue(selection, 'Nucleus_link_stp')
-        # if usdlink==None or stplink==None:
         usdlink = GetCurrentUSDLink()
         stplink = GetCurrentSTPLinkNoPrint()
 
@@ -1123,19 +624,10 @@ class _ClearJunkCmd:
         # The command will be active only if there is an active document
         return not FreeCAD.ActiveDocument is None
 
-
-
-# GUI command that links the Python script
 class _UploadCmd:
     """Command to upload a selected component to nucleus"""
-    #TODO FIX THIS!! Attach permissions to freecad ITEM so we can read from it. must somehow attach permissions from getauthcheck
-
-    
     def Activated(self):
-        # what is done when the command is clicked
-
         selection =GetCurrentSelection()
-        #TODO FIX THIS BIT = if usdlink from FreeCAd variable is different to the one from the directory
         if selection != None:
             usdlink_local = GetCurrentUSDLinkNoPrint()
             stplink_local = GetCurrentSTPLinkNoPrint()
@@ -1175,14 +667,12 @@ class _UploadCmd:
                             msgBox.setIcon(QtGui.QMessageBox.Question)
                             msgBox.setText("Failed to push to Nucleus!")
                             msgBox.exec_()
-
                 else:
                     usdlink= usdlink_fcvar
                     stplink = stplink_fcvar
             else:
                 usdlink = usdlink_local
                 stplink = stplink_local
-
             token = str(RandomTokenGenerator())
             if usdlink is not None:
                 if selection is not None:
@@ -1209,11 +699,8 @@ class _UploadCmd:
                     selection = attachNewStringProperty(selection, property_name = "Last_Nucleus_sync_time", property_value = current_time)
                     selection = attachNewStringProperty(selection, property_name = "Nucleus_link_stp", property_value = stplink)
                     selection = attachNewStringProperty(selection, property_name = "Nucleus_version_id", property_value = token)
-
             if 'is_enabled_secondary_usdlink' in dir(FreeCAD):
-
                 if FreeCAD.is_enabled_secondary_usdlink == True:
-
                     FreeCAD.secondary_usdlink = GetCurrentUSDLinkNoPrint(secondary=True)
                     output, error = DirectUploadUSDToNucleus(FreeCAD.secondary_usdlink, selection, token = token)
                     output = output.split('\r\n')
@@ -1222,7 +709,6 @@ class _UploadCmd:
                     print('ERRORS ', error)
 
     def GetResources(self):
-        # icon and command information
         MenuText = QtCore.QT_TRANSLATE_NOOP(
             'OVconnect_push_to_nucleus',
             'Push to Nucleus')
@@ -1238,34 +724,26 @@ class _UploadCmd:
         # Upload button only active when: STPlink and USDlink has been saved, permission to both are OK, and there is an active document on freecad
         usd_permission = GetCurrentUSDPermissions()
         usd_URL = GetCurrentUSDLinkNoPrint()
-
         stp_permission = GetCurrentSTPPermissions()
         stp_URL = GetCurrentSTPLinkNoPrint()
-
         is_stpPermissionOK = stp_permission == 'OK_ACCESS'
         is_stpURLExists = stp_URL!= None
         is_stpSideValid = is_stpPermissionOK ==True and is_stpURLExists==True
-
         is_usdPermissionOK = usd_permission == 'OK_ACCESS'
         is_usdURLExists = usd_URL!= None
         is_usdSideValid = is_usdPermissionOK==True and is_usdURLExists==True
-
         is_activeDocumentExists = not FreeCAD.ActiveDocument is None
-
         is_checksValid = is_activeDocumentExists == True and is_stpSideValid==True and is_usdSideValid==True
         return is_checksValid
 
 class _CheckConnectionCmd:
     """DEPRECATED CLASS!
     placeholder command to test user authetication - this is now automated"""
-    
     def Activated(self):
         # what is done when the command is clicked
         usdlink = GetCurrentUSDLink()
         if usdlink is not None:
             GetAuthCheck(usdlink)
-
-            # print('Connection validated.')
     def GetResources(self):
         # icon and command information
         MenuText = QtCore.QT_TRANSLATE_NOOP(
@@ -1283,20 +761,8 @@ class _CheckConnectionCmd:
         # The command will be active if there is an active document
         return not FreeCAD.ActiveDocument is None
 
-def GetListOfAssemblyObjects(projectURL):
-    doc = FreeCAD.ActiveDocument
-    object_list = []
-    object_label_list = []
-    for obj in doc.Objects:
-        if 'Nucleus_link_usd' in dir(obj):
-            if clean_omniverse_path(projectURL) in str(obj.Nucleus_link_usd):
-                object_list.append(obj)
-                object_label_list.append(obj.Label)
-    return object_list, object_label_list
-
-
 class AssemblyChecklistDialog(QtGui.QDialog):
-# Checklist Dialog for creating new assembly - user can select assembly components and set assembly name
+    """Checklist Dialog for creating new assembly - user can select assembly components and set assembly name"""
     def __init__(
         self,
         name,
@@ -1306,12 +772,10 @@ class AssemblyChecklistDialog(QtGui.QDialog):
         parent=None,
         ):
         super(AssemblyChecklistDialog, self).__init__(parent)
-
         self.name = name
         self.icon = icon
         self.model = QtGui.QStandardItemModel()
         self.listView = QtGui.QListView()
-
         for string in stringlist:
             item = QtGui.QStandardItem(string)
             item.setCheckable(True)
@@ -1376,11 +840,8 @@ class AssemblyChecklistDialog(QtGui.QDialog):
 def live_get_available_sessions(usdlink):
     doc = FreeCAD.ActiveDocument
     FreeCAD.setActiveDocument(doc.Name)
-    # current_instances = set(doc.findObjects())
     error_code = None
     success=None
-
-    # Batch file where the OV USD fetcher lives
     batchfilepath = GetFetcherScriptsDirectory().replace(" ","` ")
     batchfilename = GetBatchFileName(live=True)
     batchfilepath = os.path.join(batchfilepath, batchfilename)
@@ -1406,10 +867,7 @@ def live_get_available_sessions(usdlink):
     else:
         success=False
         list_of_sessions = None
-
     return success, list_of_sessions, error_code
-
-
 
 class OmniverseAssemblyPanel:
     def __init__(self,widget):
@@ -1451,7 +909,6 @@ class OmniverseAssemblyPanel:
         self.download_assy_changes_button = QtGui.QPushButton("Fetch new assembly changes")
         self.download_assy_changes_button.clicked.connect(self.flow_download_assembly_changes)
 
-        
         # LIVE ASSY DECLARATIONS
         self.proc = None
         doc = FreeCAD.ActiveDocument
@@ -1482,7 +939,6 @@ class OmniverseAssemblyPanel:
         if uploaded_components_list != []:
             form = AssemblyChecklistDialog('Create new assembly', uploaded_components_label_list, checked=True)
             if form.exec_() == QtGui.QDialog.Accepted:
-                # print(form.choices)
                 selected_object_label_list = form.choices
                 self.assembly_name = form.assembly_name
                 if self.assembly_name !='':
@@ -1550,7 +1006,6 @@ class OmniverseAssemblyPanel:
 
                 start_fetch_xform = time.time()
                 stdout, stderr, prim_data =  GetPrimReferenceXForms(selected_assembly_usd_link, token = shared_token)
-                # print('FETCH COMPONENT XFORM:', time.time()-start_fetch_xform, 's.')
                 print(prim_data)
                 
                 for dict_entry in prim_data:
@@ -1723,7 +1178,6 @@ def get_qproc_command_start_live(usdlink, session_name):
     doc = FreeCAD.ActiveDocument
     FreeCAD.setActiveDocument(doc.Name)
     currentProjectURL = GetCurrentProjectLinkNoPrint()
-    # current_instances = set(doc.findObjects())
     error_code = None
     success=None
 
@@ -1734,7 +1188,6 @@ def get_qproc_command_start_live(usdlink, session_name):
 
     cmd = batchfilepath + ' --nucleus_url'+' '+ usdlink + ' --session_name ' + session_name + ' --start_live '
     return cmd    
-
 
 async def run_live_assembly_listener(assembly_link, session_name):
     asyncio.new_event_loop().create_task(live_start_session(FreeCAD.assembly_usd_link, session_name))
@@ -1760,43 +1213,6 @@ def MoveAssemblyXformPositions(assemblyURL, component_usd_links, xform_translate
     stdout = stdout.split('\n')
     stderr = stderr.split('\n')
     return stdout, stderr
-
-
-def get_freecad_object_from_stp_reference(doc, stp_reference):
-    freecad_object = [obj for obj in doc.Objects if obj.Nucleus_link_stp == stp_reference]
-    freecad_object = freecad_object[0]
-    return freecad_object
-
-
-def GetSelectedAssemblyObjects(object_list, object_label_list, selected_object_label_list):
-    selected_objects = []
-    indices_dict = dict((k,i) for i,k in enumerate(object_label_list))
-    inter = set(indices_dict).intersection(selected_object_label_list)
-    selected_object_indices = [ indices_dict[x] for x in inter ]
-    selected_objects = [object_list[i] for i in selected_object_indices]
-    return selected_objects
-
-def text_follows_rules(input_string):
-    # Function to make sure names of Nucleus files follow rules
-    # Regular expression to match the specified rules
-    pattern = r'^[a-zA-Z][a-zA-Z0-9_]*$'
-
-    # Check if the input string matches the pattern
-    if re.match(pattern, input_string):
-        return True
-    else:
-        return False
-
-def no_restricted_strings_in_project_link(projectlink):
-    assembly_in_link = 'assembly' in projectlink
-    asset_in_link = 'asset' in projectlink
-    return not(asset_in_link or assembly_in_link)
-
-def clean_omniverse_path(path):
-    # Use regex to find any double slashes after the protocol part and replace with a single slash
-    cleaned_path = re.sub(r'(?<!:)//+', '/', path)
-    return cleaned_path
-
 
 class OmniConnectionSettingsPanel:
     # Omniverse connection settings panel
@@ -1862,23 +1278,16 @@ class OmniConnectionSettingsPanel:
 
     def show_about_page(self):
         dialog = QtGui.QInputDialog(self.form)
-        # msgBox.setIcon(QtGui.QMessageBox.Information)
-        version_info = QtGui.QLabel("FreeCAD Omniverse Connector\nVersion 3.0.2 \n\u00A9 2024 The University of Manchester")
-        # msgBox.setText("FreeCAD Omniverse Connector\nVersion 3.0.2 \n\u00A9 2024 The University of Manchester")
+        version_info = QtGui.QLabel("FreeCAD Omniverse Connector\nVersion 3.0.3 \n\u00A9 2024 The University of Manchester")
         dialog.show()
         dialog.findChild(QtGui.QLineEdit).hide()
         dialog.layout().itemAt(0).widget().hide()
 
         dialog.layout().insertWidget(1, version_info)
-        # Remove the default buttons and add a custom "Advanced" button
         button_box = dialog.findChild(QtGui.QDialogButtonBox)
-        button_box.clear()  # Clear existing buttons
-
-        # Create the Advanced button
+        button_box.clear() 
         advanced_button = QtGui.QPushButton("Advanced")
         button_box.addButton(advanced_button, QtGui.QDialogButtonBox.ActionRole)
-
-        # Connect the Advanced button to the custom slot
         advanced_button.clicked.connect(self.show_advanced_page)
 
         dialog.exec_()
@@ -1904,13 +1313,11 @@ class OmniConnectionSettingsPanel:
         usd_warning_label.setStyleSheet("color: red;")  # Warning text in red
         usd_warning_label.hide()
 
-        # Align USD components in the grid
-        grid_layout.addWidget(usd_toggle, 0, 0, 1, 1)  # Toggle in the first row, first column
-        grid_layout.addWidget(usd_link_label, 1, 1, 1, 1)  # Label in the second row, second column
-        grid_layout.addWidget(usd_link, 1, 2, 1, -1)  # Input field in the second row, spanning from the third column to the end
-        grid_layout.addWidget(usd_warning_label, 2, 1, 1, -1)  # Warning label in the third row, spanning from the second column to the end
+        grid_layout.addWidget(usd_toggle, 0, 0, 1, 1)
+        grid_layout.addWidget(usd_link_label, 1, 1, 1, 1)
+        grid_layout.addWidget(usd_link, 1, 2, 1, -1)
+        grid_layout.addWidget(usd_warning_label, 2, 1, 1, -1)
 
-        # Initialize USD link state
         if 'is_enabled_secondary_usdlink' not in dir(FreeCAD):
             FreeCAD.is_enabled_secondary_usdlink = False
 
@@ -1941,19 +1348,6 @@ class OmniConnectionSettingsPanel:
         step_warning_label.setStyleSheet("color: red;")  # Warning text in red
         step_warning_label.hide()
 
-        # # Align STEP components in the grid
-        # grid_layout.addWidget(step_toggle, 3, 0, 1, 1)  # Toggle in the fourth row, first column
-        # grid_layout.addWidget(step_link_label, 4, 1, 1, 1)  # Label in the fifth row, second column
-        # grid_layout.addWidget(step_link, 4, 2, 1, -1)  # Input field in the fifth row, spanning from the third column to the end
-        # grid_layout.addWidget(step_warning_label, 5, 1, 1, -1)  # Warning label in the sixth row, spanning from the second column to the end
-
-        # # Uncomment if STEP permissions are checked
-        # if GetCurrentSTPPermissions(secondary=True) != 'OK_ACCESS':
-        #     step_warning_label.setText("Invalid access permissions to the STEP link.")
-        #     step_warning_label.show()
-
-        # step_toggle.toggled.connect(lambda checked: step_link.setEnabled(checked))
-        # Initialize STEP link state
         if 'is_enabled_secondary_stplink' not in dir(FreeCAD):
             FreeCAD.is_enabled_secondary_stplink = False
 
@@ -1966,29 +1360,16 @@ class OmniConnectionSettingsPanel:
             step_toggle.setChecked(False)
             step_link.setEnabled(False)
 
-        # Ensure the text field remains populated if the link exists
         if hasattr(FreeCAD, 'secondary_stplink') and FreeCAD.secondary_stplink:
             step_link.setText(FreeCAD.secondary_stplink)
-
-        # Uncomment if STEP permissions are checked
-        # if GetCurrentSTPPermissions(secondary=True) != 'OK_ACCESS':
-        #     step_warning_label.setText("Invalid access permissions to the STEP link.")
-        #     step_warning_label.show()
-
-        # step_toggle.toggled.connect(lambda checked: step_link.setEnabled(checked))
-
-        # Add the grid layout to the main layout
         main_layout.addLayout(grid_layout)
 
-        # OK and Cancel buttons
         button_box = QtGui.QDialogButtonBox(QtGui.QDialogButtonBox.Ok | QtGui.QDialogButtonBox.Cancel)
         button_box.accepted.connect(advanced_dialog.accept)
         button_box.rejected.connect(advanced_dialog.reject)
         main_layout.addWidget(button_box)
 
-        # Show the dialog
         if advanced_dialog.exec_() == QtGui.QDialog.Accepted:
-            # Handle USD link
             if usd_toggle.isChecked():
                 secondary_usdlink = usd_link.text()
                 _, _, permission = GetAuthCheck(secondary_usdlink, filetype='usd', secondary=True)
@@ -2184,7 +1565,6 @@ class OmniConnectionSettingsPanel:
                 self.inputProjectURL()
 
     def checkProjectURL(self, inputProjectURL = None):
-        # self.check_button.setText('\u9203 Validating link ...')
         currentProjectURL = GetCurrentProjectLinkNoPrint()
         if inputProjectURL !=None:
             SaveProjectLinkAsTextFile(inputProjectURL)
@@ -2204,7 +1584,6 @@ class OmniConnectionSettingsPanel:
                     ok = False
                     FreeCAD.is_connected_to_nucleus_project = False
                 else:
-                    # self.check_button.setText('Link validated. Revalidate?')
                     self.currentProjectURL_text.setText(' \u2705 Project directory: '+savedURL)
                     ok = True
                     FreeCAD.is_connected_to_nucleus_project = True
@@ -2233,7 +1612,6 @@ class OmniConnectionSettingsPanel:
                     ok = False
                     FreeCAD.is_connected_to_nucleus_project = False
                 else:
-                    # self.check_button.setText('Link validated. Revalidate?')
                     self.currentProjectURL_text.setText('\u2705 Project directory: '+savedURL)
                     ok = True
                     FreeCAD.is_connected_to_nucleus_project = True
@@ -2293,7 +1671,6 @@ class OmniConnectionSettingsPanel:
                         msgBox.exec_()
                         self.dialogBoxCreateNewAsset()
                 else:
-                    # print('[WARN] Failed to create new project!')
                     msgBox = QtGui.QMessageBox()
                     msgBox.setIcon(QtGui.QMessageBox.Warning)
                     msgBox.setText("Asset names must start with a letter. \nIt can contain letters, digits, or underscores, and cannot contain spaces.")
@@ -2314,7 +1691,6 @@ class OmniConnectionSettingsPanel:
 
 
     def getListItem(self):
-        # TODO: MAKE BUTTON FOR CREATE NEW ASSET
         currentProjectURL = GetCurrentProjectLinkNoPrint()
         if currentProjectURL is not None:
             FindUSDandSTPFiles(currentProjectURL)
@@ -2345,10 +1721,8 @@ class OmniConnectionSettingsPanel:
                         usdlink = find_corresponding_element(item, item_list, usd_list)
                         usdlink_short =usdlink.split('/')[-1]
                         print(usdlink)
-
                         SaveSTPLinkAsTextFile(item)
                         SaveUSDLinkAsTextFile(usdlink)
-
                         GetAuthCheck(item,  filetype='stp')
                         GetAuthCheck(usdlink,  filetype='usd')
 
@@ -2371,13 +1745,9 @@ class OmniConnectionSettingsPanel:
             msgBox.setIcon(QtGui.QMessageBox.Warning)
             msgBox.setText("No project link specified!")
             msgBox.exec_()            
-            
-    # Ok and Cancel buttons are created by default in FreeCAD Task Panels
-    # What is done when we click on the ok button.
     def accept(self):
         FreeCADGui.Control.closeDialog() #close the dialog
 
-# GUI command that links the Python script
 class _GetURLPanel:
     """Command to create a panel where user specifies URL of nucleus file
     """
