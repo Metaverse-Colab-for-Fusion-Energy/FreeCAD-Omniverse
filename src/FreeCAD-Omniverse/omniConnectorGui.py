@@ -32,8 +32,6 @@ import os
 import Mesh
 import subprocess
 import shutil
-import random
-import string
 import ImportGui
 import re
 import time
@@ -45,555 +43,581 @@ from utils import *
 from file_utils import *
 __dir__ = os.path.dirname(__file__)
 
-### BACKEND FUNCTIONS
-
 def GetAuthCheck(usdlink, filetype='usd', secondary=False):
-    batchfilepath = GetFetcherScriptsDirectory().replace(" ","` ")
-    batchfilename = GetBatchFileName()
-    batchfilepath = os.path.join(batchfilepath, batchfilename)
-    error_code_no_permissions = 'NO_PERMISSION'
-    error_code_link_not_found = 'NOT_FOUND'
-    error_code_no_auth = 'NO_AUTH'
-    print('Validating connection with '+usdlink)
+    """
+    Checks authentication and access permissions for a given Nucleus URL.
+    
+    Args:
+        usdlink (str): The Nucleus URL to check permissions for.
+        filetype (str): Type of file ('usd', 'stp', or 'project').
+        secondary (bool): Whether this is a secondary permission check.
+    
+    Returns:
+        tuple: (stdout_lines, stderr_output, permission_status)
+    """
+    error_codes = {'NO_PERMISSION', 'NOT_FOUND', 'NO_AUTH'}
+    print(f'Validating connection with {usdlink}')
 
-    cmd = batchfilepath + ' --nucleus_url'+' '+ usdlink + ' --auth'
-    if filetype =='project':
-        cmd = batchfilepath + ' --nucleus_url'+' '+ usdlink + ' --auth_project'
+    batchfilepath = os.path.join(
+        GetFetcherScriptsDirectory().replace(" ", "` "), 
+        GetBatchFileName()
+    )
 
-    # print(cmd) # FOR DEBUG
-    p = subprocess.Popen(['powershell', cmd], shell=True, stdout = subprocess.PIPE, stderr = subprocess.PIPE)
-    stdout, stderr = p.communicate()
-    stdout = stdout.decode('utf-8')
-    stderr = stderr.decode('utf-8')
-    stdout = stdout.split('\r\n')
+    auth_flag = '--auth_project' if filetype == 'project' else '--auth'
+    cmd = f'{batchfilepath} --nucleus_url {usdlink} {auth_flag}'
+
+    process = subprocess.Popen(
+        ['powershell', cmd],
+        shell=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE
+    )
+    stdout, stderr = process.communicate()
+    stdout_lines = stdout.decode('utf-8').split('\r\n')
+    stderr_output = stderr.decode('utf-8')
+
+    # Print and check for error codes
     no_access = 0
-    for line in stdout:
-        line = str(line)
+    for line in stdout_lines:
         print('[OmniClient]', line)
-        if error_code_no_permissions in line:
-            no_access +=1
-        if error_code_link_not_found in line:
-            no_access +=1
-        if error_code_no_auth in line:
-            no_access +=1   
-    if no_access ==0:
-        permission='OK_ACCESS'
-    else:
-        permission = 'NO_ACCESS'
+        if any(code in line for code in error_codes):
+            no_access += 1
 
-    if secondary== False:
-        if filetype=='stp':
-            SaveSTPPermissionsAsTextFile(permission)
-        elif filetype=='usd':
-            SaveUSDPermissionsAsTextFile(permission)
-        elif filetype=='project':
-            SaveProjectPermissionsAsTextFile(permission)
-    elif secondary ==True:
-        if filetype=='stp':
-            SaveSecondarySTPPermissionsAsTextFile(permission)
-        elif filetype=='usd':
-            SaveSecondaryUSDPermissionsAsTextFile(permission)
-    print('[ERRORS]', stderr)
+    permission = 'OK_ACCESS' if no_access == 0 else 'NO_ACCESS'
 
-    return stdout, stderr, permission
+    # Permission saving dispatch
+    save_functions = {
+        ('usd', False): SaveUSDPermissionsAsTextFile,
+        ('stp', False): SaveSTPPermissionsAsTextFile,
+        ('project', False): SaveProjectPermissionsAsTextFile,
+        ('usd', True): SaveSecondaryUSDPermissionsAsTextFile,
+        ('stp', True): SaveSecondarySTPPermissionsAsTextFile
+    }
+
+    save_func = save_functions.get((filetype, secondary))
+    if save_func:
+        save_func(permission)
+
+    print('[ERRORS]', stderr_output)
+    return stdout_lines, stderr_output, permission
+
 
 def FindUSDandSTPFiles(usdlink):
-    batchfilepath = GetFetcherScriptsDirectory().replace(" ","` ")
-    batchfilename = GetBatchFileName()
-    batchfilepath = os.path.join(batchfilepath, batchfilename)
-    local_directory = GetLocalDirectoryName()
-    print('Finding asset files on project folder ...')
-    cmd = batchfilepath + ' --local_directory ' + local_directory + ' --nucleus_url ' + usdlink +' --find_stp_and_usd_files'
+    """
+    Finds USD and STEP files associated with a project on Nucleus.
+
+    Args:
+        usdlink (str): The Nucleus URL of the project.
+
+    Returns:
+        tuple: (stdout_lines, stderr_output)
+    """
+    print('Finding asset files in the project folder ...')
+
+    # Assemble paths and command
+    script_dir = GetFetcherScriptsDirectory().replace(" ", "` ")
+    batch_file = GetBatchFileName()
+    batch_path = os.path.join(script_dir, batch_file)
+    local_dir = GetLocalDirectoryName()
+
+    cmd = f'{batch_path} --local_directory {local_dir} --nucleus_url {usdlink} --find_stp_and_usd_files'
     print(cmd)
-    p = subprocess.Popen(['powershell', cmd], shell=True, stdout = subprocess.PIPE, stderr = subprocess.PIPE)
-    stdout, stderr = p.communicate()
-    stdout = stdout.decode('utf-8')
-    stderr = stderr.decode('utf-8')
-    stdout = stdout.split('\r\n')
-    for line in stdout:
-        line = str(line)
-        print('[OmniClient] '+line)
-    print('ERRORS: '+ stderr)
-    return stdout, stderr
 
-def UploadUSDToNucleus(usdlink, selected_object, token, existing_usd = True, secondary = False):
-    if existing_usd == True:
-        permission = GetCurrentUSDPermissions(secondary=secondary)
-        if permission =='NO_ACCESS':
-            print('[ERROR] NO_PERMISSION: Cannot access USD file: '+ usdlink)
-            print('[ERROR] You do not have permissions to access this file! Contact your Nucleus administrator.')
-            print('Try logging in under a different username: log out through the nucleus. SIGNOUT BUTTON IS WIP')
-            stdout='FAIL'
-            stderr='NO_PERMISSION'
-        elif permission is None:
-            print('[ERROR] PERMISSION_NOT_FOUND: Cannot access USD file: '+ usdlink)
-            print('[ERROR] You have not entered a valid USD link.')
-            stdout='FAIL'
-            stderr='PERMISSION_NOT_FOUND'
-        elif permission == 'OK_ACCESS': 
-            batchfilepath = GetFetcherScriptsDirectory().replace(" ","` ")
-            batchfilename = GetBatchFileName()
-            batchfilepath = os.path.join(batchfilepath, batchfilename)
-            local_STL_path = GetLocalDirectoryName()
-            print('local_STL_path', local_STL_path)
-            print('Unique version identifier: '+token)
-            local_STL_filename = local_STL_path +  '/'+token+'upload.stl'
-            Mesh.export([selected_object], local_STL_filename)
-            print('local_STL_filename', local_STL_filename)
-            cmd = batchfilepath + ' --nucleus_url' +' '+ usdlink + ' --local_directory '+ local_STL_path.replace(" ","` ") +' --push' +" --token "+ token
-            print(cmd)
-            p = subprocess.Popen(['powershell', cmd], shell=True, stdout = subprocess.PIPE, stderr = subprocess.PIPE)
-            stdout, stderr = p.communicate()
-            stdout = stdout.decode('utf-8')
-            stderr = stderr.decode('utf-8')
-    return stdout, stderr
+    # Run the command
+    process = subprocess.Popen(
+        ['powershell', cmd],
+        shell=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE
+    )
+    stdout, stderr = process.communicate()
+    stdout_lines = stdout.decode('utf-8').split('\r\n')
+    stderr_output = stderr.decode('utf-8')
 
-def DirectUploadUSDToNucleus(usdlink, selected_object, token, existing_usd = True, secondary = False):
-    if existing_usd == True:
-        permission = GetCurrentUSDPermissions(secondary=secondary)
-        if permission =='NO_ACCESS':
-            print('[ERROR] NO_PERMISSION: Cannot access USD file: '+ usdlink)
-            print('[ERROR] You do not have permissions to access this file! Contact your Nucleus administrator.')
-            print('Try logging in under a different username: log out through the nucleus. SIGNOUT BUTTON IS WIP')
-            stdout='FAIL'
-            stderr='NO_PERMISSION'
-        elif permission is None:
-            print('[ERROR] PERMISSION_NOT_FOUND: Cannot access USD file: '+ usdlink)
-            print('[ERROR] You have not entered a valid USD link.')
-            stdout='FAIL'
-            stderr='PERMISSION_NOT_FOUND'
-        elif permission == 'OK_ACCESS': 
-            batchfilepath = GetFetcherScriptsDirectory().replace(" ","` ")
-            batchfilename = GetBatchFileName()
-            batchfilepath = os.path.join(batchfilepath, batchfilename)
-            local_STL_path = GetLocalDirectoryName()
-            print('local_STL_path', local_STL_path)
-            print('Unique version identifier: '+token)
-            local_STL_filename = local_STL_path +  '/'+token+'upload.stl'
-            Mesh.export([selected_object], local_STL_filename)
-            print('local_STL_filename', local_STL_filename)
-            cmd = batchfilepath + ' --nucleus_url' +' '+ usdlink + ' --local_directory '+ local_STL_path.replace(" ","` ") +' --create_new_usd' +" --token "+ token
-            print(cmd)
-            p = subprocess.Popen(['powershell', cmd], shell=True, stdout = subprocess.PIPE, stderr = subprocess.PIPE)
-            stdout, stderr = p.communicate()
-            stdout = stdout.decode('utf-8')
-            stderr = stderr.decode('utf-8')
-    return stdout, stderr
+    # Output results
+    for line in stdout_lines:
+        print('[OmniClient]', line)
+    print('ERRORS:', stderr_output)
 
-def UploadSTPToNucleus(stplink, selected_object, token, existing_stp = True, custom_checkpoint = None, secondary = False):
-    if existing_stp ==True:
-        permission = GetCurrentSTPPermissions()
-        if permission =='NO_ACCESS':
-            print('[ERROR] NO_PERMISSION: Cannot access STP file: '+ stplink)
-            print('[ERROR] You do not have permissions to access this file! Contact your Nucleus administrator.')
-            print('Try logging in under a different username: log out through the nucleus.')
-            stdout='FAIL'
-            stderr='NO_PERMISSION'
-        elif permission is None:
-            print('[ERROR] PERMISSION_NOT_FOUND: Cannot access STP file: '+ stplink)
-            print('[ERROR] You have not entered a valid Nucleus link.')
-            stdout='FAIL'
-            stderr='PERMISSION_NOT_FOUND'
-        elif permission == 'OK_ACCESS': 
-        # Batch file where the OV USD uploader lives
-            batchfilepath = GetFetcherScriptsDirectory().replace(" ","` ")
-            batchfilename = GetBatchFileName()
-            batchfilepath = os.path.join(batchfilepath, batchfilename)
-            local_directory = GetLocalDirectoryName()
-            print('Unique version identifier: '+token)
-            local_STP_filepath = os.path.join(local_directory, token+'upload.stp')
-            ImportGui.export([selected_object], local_STP_filepath)
-            cmd = batchfilepath + ' --nucleus_url' +' '+ stplink + ' --local_non_usd_filename '+ local_STP_filepath.replace(" ","` ") +' --push_non_usd' +" --token "+ token
-            if custom_checkpoint != None:
-                custom_checkpoint = '\"'+ custom_checkpoint + '\"'
-                cmd = cmd + ' --custom_checkpoint ' + str(custom_checkpoint)
-            print(cmd)
-            p = subprocess.Popen(['powershell', cmd], shell=True, stdout = subprocess.PIPE, stderr = subprocess.PIPE)
-            stdout, stderr = p.communicate()
-            stdout = stdout.decode('utf-8')
-            stderr = stderr.decode('utf-8')
-    return stdout, stderr
+    return stdout_lines, stderr_output
+
+
+def UploadUSDToNucleus(usdlink, selected_object, token, secondary=False, overwrite_history=False):
+    """
+    Uploads a mesh (converted to STL) to a Nucleus USD location using a batch script.
+
+    Args:
+        usdlink (str): Nucleus USD URL (primary or secondary depending on 'secondary').
+        selected_object (FreeCAD object): The object to export and upload.
+        token (str): Unique identifier for the upload session.
+        secondary (bool): Whether this is a secondary (fallback) USD location.
+        overwrite_history (bool): If True, creates a fresh USd with zero version history
+
+    Returns:
+        tuple: (stdout_output, stderr_output)
+    """
+    # Get permissions for primary or secondary USD
+    permission = GetCurrentUSDPermissions(secondary=secondary)
+
+    if permission == 'NO_ACCESS':
+        print(f'[ERROR] NO_PERMISSION: Cannot access USD file: {usdlink}')
+        print('[ERROR] You do not have permissions to access this file! Contact your Nucleus administrator.')
+        return 'FAIL', 'NO_PERMISSION'
+
+    if permission is None:
+        print(f'[ERROR] PERMISSION_NOT_FOUND: Cannot access USD file: {usdlink}')
+        print('[ERROR] You have not entered a valid USD link.')
+        return 'FAIL', 'PERMISSION_NOT_FOUND'
+
+    if permission == 'OK_ACCESS':
+        script_dir = GetFetcherScriptsDirectory().replace(" ", "` ")
+        batch_file = GetBatchFileName()
+        batch_path = os.path.join(script_dir, batch_file)
+
+        local_dir = GetLocalDirectoryName()
+        stl_filename = f'{token}upload.stl'
+        stl_path = os.path.join(local_dir, stl_filename)
+
+        print(f'[INFO] Exporting mesh to: {stl_path}')
+        print(f'[INFO] Upload token: {token}')
+
+        # Export to STL file
+        Mesh.export([selected_object], stl_path)
+
+        # Select push or overwrite mode
+        action_flag = '--create_new_usd' if overwrite_history else '--push'
+
+        # Build command
+        cmd = f'{batch_path} --nucleus_url {usdlink} --local_directory {local_dir.replace(" ", "` ")} {action_flag} --token {token}'
+        print(f'[CMD] {cmd}')
+
+        process = subprocess.Popen(
+            ['powershell', cmd],
+            shell=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE
+        )
+        stdout, stderr = process.communicate()
+        return stdout.decode('utf-8'), stderr.decode('utf-8')
+
+    return 'FAIL', 'UNKNOWN_PERMISSION_STATUS'
+
+
+def UploadSTPToNucleus(stplink, selected_object, token, custom_checkpoint=None, secondary=False):
+    """
+    Uploads a STEP file to Nucleus using the batch uploader.
+
+    Args:
+        stplink (str): The Nucleus STP destination URL.
+        selected_object (FreeCAD object): The object to export and upload.
+        token (str): Unique identifier for the upload session.
+        custom_checkpoint (str, optional): A string to tag this upload with a custom label.
+        secondary (bool): Use secondary permission rules if True.
+
+    Returns:
+        tuple: (stdout_output, stderr_output)
+    """
+
+    permission = GetCurrentSTPPermissions(secondary=secondary)
+
+    if permission == 'NO_ACCESS':
+        print(f'[ERROR] NO_PERMISSION: Cannot access STP file: {stplink}')
+        print('[ERROR] You do not have permissions to access this file! Contact your Nucleus administrator.')
+        return 'FAIL', 'NO_PERMISSION'
+
+    if permission is None:
+        print(f'[ERROR] PERMISSION_NOT_FOUND: Cannot access STP file: {stplink}')
+        print('[ERROR] You have not entered a valid Nucleus link.')
+        return 'FAIL', 'PERMISSION_NOT_FOUND'
+
+    if permission != 'OK_ACCESS':
+        return 'FAIL', 'UNKNOWN_PERMISSION_STATUS'
+
+    # Setup paths
+    script_dir = GetFetcherScriptsDirectory().replace(" ", "` ")
+    batch_file = GetBatchFileName()
+    batch_path = os.path.join(script_dir, batch_file)
+    local_dir = GetLocalDirectoryName()
+    stp_filename = f'{token}upload.stp'
+    stp_path = os.path.join(local_dir, stp_filename)
+
+    print('Unique version identifier:', token)
+    print('local_STP_filepath:', stp_path)
+
+    # Export to .stp
+    ImportGui.export([selected_object], stp_path)
+
+    # Build command
+    cmd = (
+        f'{batch_path} --nucleus_url {stplink} '
+        f'--local_non_usd_filename {stp_path.replace(" ", "` ")} '
+        f'--push_non_usd --token {token}'
+    )
+
+    if custom_checkpoint:
+        checkpoint_escaped = f'"{custom_checkpoint}"'
+        cmd += f' --custom_checkpoint {checkpoint_escaped}'
+
+    print(f'[CMD] {cmd}')
+
+    process = subprocess.Popen(
+        ['powershell', cmd],
+        shell=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE
+    )
+    stdout, stderr = process.communicate()
+    return stdout.decode('utf-8'), stderr.decode('utf-8')
 
 def DownloadUSDFromNucleus(usdlink):
-    # Deprecated function. USDs are now not downloaded from Nucleus
+    """
+    Deprecated function. USDs are now not downloaded from Nucleus. Attempts to pull a USD file from Nucleus and insert the resulting STL if permitted.
+    
+    Args:
+        usdlink (str): The Nucleus URL to download from.
+
+    Returns:
+        tuple: (stdout_output, stderr_output)
+    """
     permission = GetCurrentUSDPermissions()
-    print('File permission: '+permission)
-    if permission =='NO_ACCESS':
-        print('[ERROR] NO_PERMISSION: Cannot access USD file: '+ usdlink)
+    print(f'File permission: {permission}')
+
+    if permission == 'NO_ACCESS':
+        print(f'[ERROR] NO_PERMISSION: Cannot access USD file: {usdlink}')
         print('[ERROR] You do not have permissions to access this file! Contact your Nucleus administrator.')
         print('Try logging in under a different username: log out through the nucleus. SIGNOUT BUTTON IS WIP')
-    elif permission is None:
-        print('[ERROR] PERMISSION_NOT_FOUND: Cannot access USD file: '+ usdlink)
-        print('[ERROR] You have not entered a valid USD link.')
-    elif permission == 'OK_ACCESS':        
-        doc = FreeCAD.ActiveDocument
-        batchfilepath = GetFetcherScriptsDirectory().replace(" ","` ")
-        batchfilename = GetBatchFileName()
-        batchfilepath = os.path.join(batchfilepath, batchfilename)
-        local_STL_path = GetLocalDirectoryName()
-        token = str(RandomTokenGenerator())
-        print('Unique version identifier: '+token)
-        cmd = batchfilepath  + ' --nucleus_url' +' '+ usdlink + ' --local_directory '+ local_STL_path.replace(" ","` ") +' --pull' + " --token "+ token
-        print(cmd)
-        p = subprocess.Popen(['powershell', cmd], shell=True, stdout = subprocess.PIPE, stderr = subprocess.PIPE)
-        stdout, stderr = p.communicate()
-        stdout = stdout.decode('utf-8')
-        stderr = stderr.decode('utf-8')
-        local_STL_filename = local_STL_path +  '/'+token+'download.stl'
-        if os.path.exists(local_STL_filename):
-            Mesh.insert(local_STL_filename)
-        else:
-            print('[ERROR] DLOAD_FAIL: USD download failed!')
-    return stdout, stderr
+        return 'FAIL', 'NO_PERMISSION'
 
-def DownloadSTPFromNucleus(stplink, token, custom_checkpoint = None):
-    # Downloads a step file hosted on nucleus
-    imported_object = None
+    if permission is None:
+        print(f'[ERROR] PERMISSION_NOT_FOUND: Cannot access USD file: {usdlink}')
+        print('[ERROR] You have not entered a valid USD link.')
+        return 'FAIL', 'PERMISSION_NOT_FOUND'
+
+    if permission != 'OK_ACCESS':
+        return 'FAIL', 'UNKNOWN_PERMISSION_STATUS'
+
+    # Permission OK — proceed with download
+    doc = FreeCAD.ActiveDocument  # Required to allow Mesh.insert
+    script_dir = GetFetcherScriptsDirectory().replace(" ", "` ")
+    batch_file = GetBatchFileName()
+    batch_path = os.path.join(script_dir, batch_file)
+
+    local_dir = GetLocalDirectoryName()
+    token = str(RandomTokenGenerator())
+    stl_filename = f'{token}download.stl'
+    stl_path = os.path.join(local_dir, stl_filename)
+
+    print(f'Unique version identifier: {token}')
+    
+    cmd = (
+        f'{batch_path} --nucleus_url {usdlink} '
+        f'--local_directory {local_dir.replace(" ", "` ")} '
+        f'--pull --token {token}'
+    )
+    print(f'[CMD] {cmd}')
+
+    process = subprocess.Popen(
+        ['powershell', cmd],
+        shell=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE
+    )
+    stdout, stderr = process.communicate()
+    stdout_decoded = stdout.decode('utf-8')
+    stderr_decoded = stderr.decode('utf-8')
+
+    if os.path.exists(stl_path):
+        Mesh.insert(stl_path)
+    else:
+        print('[ERROR] DLOAD_FAIL: USD download failed!')
+
+    return stdout_decoded, stderr_decoded
+
+def DownloadSTPFromNucleus(stplink, token, custom_checkpoint=None):
+    """
+    Downloads a STEP (.stp) file from Nucleus and inserts it into the active FreeCAD document.
+    """
+    imported_object, fc_err = None, None
     permission = GetCurrentSTPPermissions()
-    print('File permission: '+permission)
-    if permission =='NO_ACCESS':
-        print('[ERROR] NO_PERMISSION: Cannot access STP file: '+ stplink)
-        fc_err = '[ERROR] NO_PERMISSION: Cannot access STP file: '+ stplink
-        print('[ERROR] You do not have permissions to access this file! Contact your Nucleus administrator.')
-        print('Try logging in under a different username: log out through the nucleus.')
-    elif permission is None:
-        print('[ERROR] PERMISSION_NOT_FOUND: Cannot access STP file: '+ stplink)
-        fc_err = '[ERROR] PERMISSION_NOT_FOUND: Cannot access STP file: '+ stplink
-        print('[ERROR] You have not entered a valid Nucleus link.')
-    elif permission == 'OK_ACCESS':        
-        doc = FreeCAD.ActiveDocument
-        FreeCAD.setActiveDocument(doc.Name)
-        current_instances = set(doc.findObjects())
-        fc_err = None
-        batchfilepath = GetFetcherScriptsDirectory().replace(" ","` ")
-        batchfilename = GetBatchFileName()
-        batchfilepath = os.path.join(batchfilepath, batchfilename)
-        local_directory_path = GetLocalDirectoryName()
-        print('Unique version identifier: '+token)
-        local_STP_filepath = os.path.join(local_directory_path, token+'download.stp')
-        cmd = batchfilepath  + ' --nucleus_url '+ stplink + ' --pull_non_usd ' + " --local_non_usd_filename "+ local_STP_filepath.replace(" ","` ") + " --token " + token
-        if custom_checkpoint != None:
-            custom_checkpoint = '\"'+ custom_checkpoint + '\"'
-            cmd = cmd + ' --custom_checkpoint ' + str(custom_checkpoint)
-        print(cmd)
-        p = subprocess.Popen(['powershell', cmd], shell=True, stdout = subprocess.PIPE, stderr = subprocess.PIPE)
-        stdout, stderr = p.communicate()
-        stdout = stdout.decode('utf-8')
-        stderr = stderr.decode('utf-8')
-        if os.path.exists(local_STP_filepath):
-            if check_file_isempty(local_STP_filepath)==False:
-                imported_object = ImportGui.insert(local_STP_filepath, doc.Name, useLinkGroup=True, merge = False)
-                ok=True
-            else:
-                fc_err = '[ERROR] EMPTY_ASSET: Asset is a placeholder item. Push an object to Nucleus to replace the placeholder.'
-                print(fc_err)
-                ok=False
-        else:
-            fc_err = '[ERROR] DLOAD_FAIL: STP download failed!'
-            print(fc_err)
-            ok=False
-    return ok, imported_object, stdout, stderr, fc_err
+    print(f'File permission: {permission}')
+
+    if permission != 'OK_ACCESS':
+        err_map = {
+            'NO_ACCESS': '[ERROR] NO_PERMISSION',
+            None: '[ERROR] PERMISSION_NOT_FOUND'
+        }
+        fc_err = f"{err_map.get(permission, '[ERROR] UNKNOWN')} : Cannot access STP file: {stplink}"
+        print(fc_err)
+        return False, None, 'FAIL', err_map.get(permission, 'UNKNOWN'), fc_err
+
+    FreeCAD.setActiveDocument(FreeCAD.ActiveDocument.Name)
+    batch_path = os.path.join(GetFetcherScriptsDirectory().replace(" ", "` "), GetBatchFileName())
+    local_dir = GetLocalDirectoryName()
+    stp_path = os.path.join(local_dir, f'{token}download.stp')
+
+    cmd = (
+        f'{batch_path} --nucleus_url {stplink} --pull_non_usd '
+        f'--local_non_usd_filename {stp_path.replace(" ", "` ")} --token {token}'
+    )
+    if custom_checkpoint:
+        cmd += f' --custom_checkpoint "{custom_checkpoint}"'
+    print(f'[CMD] {cmd}')
+
+    p = subprocess.Popen(['powershell', cmd], shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    stdout, stderr = p.communicate()
+    stdout, stderr = stdout.decode(), stderr.decode()
+
+    if os.path.exists(stp_path) and not check_file_isempty(stp_path):
+        imported_object = ImportGui.insert(stp_path, FreeCAD.ActiveDocument.Name, useLinkGroup=True, merge=False)
+        return True, imported_object, stdout, stderr, None
+
+    fc_err = '[ERROR] EMPTY_ASSET: Placeholder or failed download.' if os.path.exists(stp_path) else '[ERROR] DLOAD_FAIL: STP download failed!'
+    print(fc_err)
+    return False, None, stdout, stderr, fc_err
 
 def CreateNewProjectOnNucleus(host_name, project_name, make_public=False):
-    # Calls function that creates new directory on Nucleus for projects
-    batchfilepath = GetFetcherScriptsDirectory().replace(" ","` ")
-    batchfilename = GetBatchFileName()
-    batchfilepath = os.path.join(batchfilepath, batchfilename)
-    if make_public ==False:
-        cmd = batchfilepath + ' --create_new_project ' + ' --project_name ' + str(project_name) + ' --host_name ' + str(host_name)
-    elif make_public ==True:
-        cmd = batchfilepath + ' --create_new_project ' + ' --project_name ' + str(project_name) + ' --host_name ' + str(host_name) + ' --make_public '
-    print(cmd)
-    p = subprocess.Popen(['powershell', cmd], shell=True, stdout = subprocess.PIPE, stderr = subprocess.PIPE)
-    stdout, stderr = p.communicate()
-    stdout = stdout.decode('utf-8')
-    stderr = stderr.decode('utf-8')
+    """
+    Creates a new project directory on Nucleus.
 
-    if "error" in stdout.lower():
-        ok = False
-    else:
-        ok =True
-    stdout = stdout.split('\n')
-    stderr = stderr.split('\n')        
-    return ok, stdout, stderr
+    Args:
+        host_name (str): Nucleus host.
+        project_name (str): Name of the project to create.
+        make_public (bool): Whether the project should be public.
 
-def CreateNewAssemblyOnNucleus(projectURL, assembly_name = None, assembly_items_usd_links=None, assembly_items_stp_links=None, token=None):
-    #a wrapper function for create new assembly
-    batchfilepath = GetFetcherScriptsDirectory().replace(" ","` ")
-    batchfilename = GetBatchFileName()
-    batchfilepath = os.path.join(batchfilepath, batchfilename)
-    assembly_usd_link = None
-    if assembly_name == None:
-        assembly_name = 'assembly'
-    if assembly_items_usd_links!=None and assembly_items_stp_links!=None:
-        str_assembly_items_usd = ' '.join(assembly_items_usd_links)
-        str_assembly_items_stp = ' '.join(assembly_items_stp_links)
-        cmd = batchfilepath + ' --nucleus_url '+ str(projectURL) + ' --create_new_assembly ' + ' --assembly_name ' + str(assembly_name) +' --asset_usd_links '+ str(str_assembly_items_usd) + ' --asset_stp_links '+ str(str_assembly_items_stp)
-    else:
-        cmd = batchfilepath + ' --nucleus_url '+ str(projectURL) + ' --create_new_assembly ' + ' --assembly_name ' + str(assembly_name)
-    if token is not None:
-        cmd = cmd + ' --token ' + str(token)
-    print(cmd)
-    p = subprocess.Popen(['powershell', cmd], shell=True, stdout = subprocess.PIPE, stderr = subprocess.PIPE)
-    stdout, stderr = p.communicate()
-    stdout = stdout.decode('utf-8')
-    stderr = stderr.decode('utf-8')
-    # print(stdout[-1])
-    stdout = stdout.split('\n')
-    stderr = stderr.split('\n')
-    for line in stdout:
-        line = line.strip()
-        if '.usd' and str(projectURL+'/assembly') in line:
-            assembly_usd_link = line
-    return stdout, stderr, assembly_usd_link
+    Returns:
+        tuple: (ok, stdout_lines, stderr_lines)
+    """
+    batch_path = os.path.join(GetFetcherScriptsDirectory().replace(" ", "` "), GetBatchFileName())
+    cmd = (
+        f'{batch_path} --create_new_project --project_name {project_name} '
+        f'--host_name {host_name} {"--make_public" if make_public else ""}'
+    )
 
-def AddCheckpointToUSDOnNucleus(usd_url, custom_checkpoint, token=None):
-    batchfilepath = GetFetcherScriptsDirectory().replace(" ","` ")
-    batchfilename = GetBatchFileName()
-    batchfilepath = os.path.join(batchfilepath, batchfilename)
-    custom_checkpoint = '\"'+ custom_checkpoint + '\"'
-    cmd = batchfilepath + ' --nucleus_url ' + str(usd_url) + ' --add_checkpoint_to_usd '
-    if token!=None:
-        cmd = cmd + ' --token ' + str(token) + ' --custom_checkpoint ' + custom_checkpoint
-    else:
-        cmd  = cmd + ' --custom_checkpoint ' + custom_checkpoint
-    print(cmd)
-    p = subprocess.Popen(['powershell', cmd], shell=True, stdout = subprocess.PIPE, stderr = subprocess.PIPE)
+    print(f'[CMD] {cmd}')
+    p = subprocess.Popen(['powershell', cmd], shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     stdout, stderr = p.communicate()
+    stdout_decoded, stderr_decoded = stdout.decode(), stderr.decode()
 
-def AddCheckpointToNonUSDOnNucleus(usd_url, custom_checkpoint, token=None):
-    batchfilepath = GetFetcherScriptsDirectory().replace(" ","` ")
-    batchfilename = GetBatchFileName()
-    batchfilepath = os.path.join(batchfilepath, batchfilename)
-    custom_checkpoint = '\"'+ custom_checkpoint + '\"'
-    cmd = batchfilepath + ' --nucleus_url ' + str(usd_url) + ' --add_checkpoint_to_non_usd ' 
-    if token!=None:
-        cmd = cmd + ' --token ' + str(token) + ' --custom_checkpoint ' + custom_checkpoint
-    else:
-        cmd  = cmd + ' --custom_checkpoint ' + custom_checkpoint
-    print(cmd)
-    p = subprocess.Popen(['powershell', cmd], shell=True, stdout = subprocess.PIPE, stderr = subprocess.PIPE)
+    ok = "error" not in stdout_decoded.lower()
+    return ok, stdout_decoded.split('\n'), stderr_decoded.split('\n')
+
+def CreateNewAssemblyOnNucleus(projectURL, assembly_name='assembly',
+                                assembly_items_usd_links=None, assembly_items_stp_links=None, token=None):
+    """
+    Creates a new assembly in a Nucleus project and returns its USD link if successful.
+    """
+    batch_path = os.path.join(GetFetcherScriptsDirectory().replace(" ", "` "), GetBatchFileName())
+    cmd = (
+        f'{batch_path} --nucleus_url {projectURL} --create_new_assembly '
+        f'--assembly_name {assembly_name}'
+    )
+
+    if assembly_items_usd_links and assembly_items_stp_links:
+        cmd += f' --asset_usd_links {" ".join(assembly_items_usd_links)}'
+        cmd += f' --asset_stp_links {" ".join(assembly_items_stp_links)}'
+
+    if token:
+        cmd += f' --token {token}'
+
+    print(f'[CMD] {cmd}')
+    p = subprocess.Popen(['powershell', cmd], shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     stdout, stderr = p.communicate()
+    stdout_lines = stdout.decode().split('\n')
+    stderr_lines = stderr.decode().split('\n')
+
+    # Find the generated assembly USD link
+    assembly_usd_link = next((line.strip() for line in stdout_lines
+                              if '.usd' in line and f'{projectURL}/assembly' in line), None)
+
+    return stdout_lines, stderr_lines, assembly_usd_link
+
+def AddCheckpointToNucleusAsset(url, custom_checkpoint, token=None, filetype='usd'):
+    """
+    Adds a checkpoint comment to a Nucleus asset (USD or non-USD).
+
+    Args:
+        url (str): Nucleus file URL.
+        custom_checkpoint (str): Checkpoint label.
+        token (str, optional): Upload token.
+        filetype (str): 'usd' (default) or 'non_usd'.
+    """
+    batch_path = os.path.join(GetFetcherScriptsDirectory().replace(" ", "` "), GetBatchFileName())
+    checkpoint = f'"{custom_checkpoint}"'
+    flag = '--add_checkpoint_to_usd' if filetype == 'usd' else '--add_checkpoint_to_non_usd'
+
+    cmd = f'{batch_path} --nucleus_url {url} {flag} --custom_checkpoint {checkpoint}'
+    if token:
+        cmd += f' --token {token}'
+
+    print(f'[CMD] {cmd}')
+    subprocess.Popen(['powershell', cmd], shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE).communicate()
+
 
 def FindExistingAssembliesOnNucleus(projectURL):
-    # searches for existing assemblies of a given project
-    batchfilepath = GetFetcherScriptsDirectory().replace(" ","` ")
-    batchfilename = GetBatchFileName()
-    batchfilepath = os.path.join(batchfilepath, batchfilename)
+    """
+    Searches for existing assembly USD files in a given Nucleus project.
+    """
+    batch_path = os.path.join(GetFetcherScriptsDirectory().replace(" ", "` "), GetBatchFileName())
+    cmd = f'{batch_path} --nucleus_url {projectURL} --find_existing_assemblies'
+    print(f'[CMD] {cmd}')
 
-    cmd = batchfilepath + ' --nucleus_url '+ str(projectURL) + ' --find_existing_assemblies '
-    print(cmd)
-    p = subprocess.Popen(['powershell', cmd], shell=True, stdout = subprocess.PIPE, stderr = subprocess.PIPE)
+    p = subprocess.Popen(['powershell', cmd], shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     stdout, stderr = p.communicate()
-    stdout = stdout.decode('utf-8')
-    stderr = stderr.decode('utf-8')
-    # print(stdout[-1])
-    stdout = stdout.split('\n')
-    stderr = stderr.split('\n')
-    existing_assembly_usd_links = []
-    for line in stdout:
-        line = line.strip()
-        if '.usd' and str('/assembly') in line:
-            existing_assembly_usd_links.append(line)
-    if existing_assembly_usd_links ==[]:
-        existing_assembly_usd_links = None
-    return stdout, stderr, existing_assembly_usd_links
+    stdout_lines = stdout.decode().split('\n')
+    stderr_lines = stderr.decode().split('\n')
 
-def GetPrimReferenceXForms(assemblyURL, token = None):
-    # Getter function to fetch reference, transform, rotation, and scale of objects in an assembly.
-    batchfilepath = GetFetcherScriptsDirectory().replace(" ","` ")
-    batchfilename = GetBatchFileName()
-    batchfilepath = os.path.join(batchfilepath, batchfilename)
+    links = [line.strip() for line in stdout_lines if '/assembly' in line and '.usd' in line]
+    return stdout_lines, stderr_lines, links or None
 
-    cmd = batchfilepath + ' --nucleus_url '+ str(assemblyURL) + ' --get_prim_reference_xforms '
-    if token!=None:
-        cmd = cmd + ' --token ' + str(token)
-    print(cmd)
-    p = subprocess.Popen(['powershell', cmd], shell=True, stdout = subprocess.PIPE, stderr = subprocess.PIPE)
-    stdout, stderr = p.communicate()
-    stdout = stdout.decode('utf-8')
-    stderr = stderr.decode('utf-8')
-    stdout = stdout.split('\n')
-    stderr = stderr.split('\n')
-    prim_data =[]
-    for line in stdout:
-        reference_data = line.split('|')
-        reference_data = [data.strip() for data in reference_data]
-        if reference_data !=['']:
-            if '.usda' in str(reference_data[0]):
-                step_path = str(reference_data[0]).replace('.usda', '.stp')
-            elif '.usd' in str(reference_data[0]):
-                step_path = str(reference_data[0]).replace('.usd', '.stp')
-            reference_dict = {
-            "ref-path": str(reference_data[0]),
-            "step-path": str(step_path),
-            "transform": ast.literal_eval(reference_data[1]),
-            "rot-xyz": ast.literal_eval(reference_data[2]),
-            "scale": ast.literal_eval(reference_data[3])
-            }
-            prim_data.append(reference_dict)
-    if prim_data ==[]:
-        primdata = None
 
-    return stdout, stderr, prim_data
+def GetPrimReferenceXForms(assemblyURL, token=None):
+    """
+    Fetches reference, transform, rotation, and scale data of prims in a Nucleus assembly.
 
-def CreateNewAssetOnNucleus(asset_name, use_url = True, projectURL=None, host_name=None, project_name=None, token=None):
-    batchfilepath = GetFetcherScriptsDirectory().replace(" ","` ")
-    batchfilename = GetBatchFileName()
-    batchfilepath = os.path.join(batchfilepath, batchfilename)
-    if use_url ==False:
-        cmd = batchfilepath + ' --create_new_asset ' + ' --project_name ' + str(project_name) + ' --host_name ' + str(host_name) + ' --asset_name ' + str(asset_name)
-    elif use_url==True:
-        cmd = batchfilepath + ' --create_new_asset ' + ' --nucleus_url ' + str(projectURL) + ' --asset_name ' + str(asset_name)
+    Returns:
+        tuple: (stdout_lines, stderr_lines, list of reference dictionaries or None)
+    """
+    batch_path = os.path.join(GetFetcherScriptsDirectory().replace(" ", "` "), GetBatchFileName())
+    cmd = f'{batch_path} --nucleus_url {assemblyURL} --get_prim_reference_xforms'
     if token:
-        cmd += ' --token '+ token
-    print(cmd)
-    p = subprocess.Popen(['powershell', cmd], shell=True, stdout = subprocess.PIPE, stderr = subprocess.PIPE)
+        cmd += f' --token {token}'
+    print(f'[CMD] {cmd}')
+
+    p = subprocess.Popen(['powershell', cmd], shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     stdout, stderr = p.communicate()
-    stdout = stdout.decode('utf-8')
-    stderr = stderr.decode('utf-8')
-    # print(stdout[-1])
-    stdout = stdout.split('\n')
-    stderr = stderr.split('\n')
-    error = None
-    for line in stdout:
-        line = line.strip()
+    stdout_lines = stdout.decode().split('\n')
+    stderr_lines = stderr.decode().split('\n')
+
+    prim_data = []
+    for line in stdout_lines:
+        parts = [p.strip() for p in line.split('|')]
+        if len(parts) == 4 and parts[0]:
+            step_path = parts[0].replace('.usda', '.stp').replace('.usd', '.stp')
+            prim_data.append({
+                "ref-path": parts[0],
+                "step-path": step_path,
+                "transform": ast.literal_eval(parts[1]),
+                "rot-xyz": ast.literal_eval(parts[2]),
+                "scale": ast.literal_eval(parts[3])
+            })
+
+    return stdout_lines, stderr_lines, prim_data or None
+
+def CreateNewAssetOnNucleus(asset_name, use_url=True, projectURL=None, host_name=None, project_name=None, token=None):
+    """
+    Creates a new asset on Nucleus and returns associated links and any error.
+
+    Returns:
+        tuple: (stdout_lines, stderr_lines, stplink, usdlink, error)
+    """
+    batch_path = os.path.join(GetFetcherScriptsDirectory().replace(" ", "` "), GetBatchFileName())
+
+    if use_url:
+        cmd = f'{batch_path} --create_new_asset --nucleus_url {projectURL} --asset_name {asset_name}'
+    else:
+        cmd = f'{batch_path} --create_new_asset --project_name {project_name} --host_name {host_name} --asset_name {asset_name}'
+    if token:
+        cmd += f' --token {token}'
+    print(f'[CMD] {cmd}')
+    p = subprocess.Popen(['powershell', cmd], shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    stdout, stderr = p.communicate()
+    stdout_lines = stdout.decode().split('\n')
+    stderr_lines = stderr.decode().split('\n')
+
+    stplink = usdlink = error = None
+    for line in map(str.strip, stdout_lines):
         if '.usd' in line:
             usdlink = line
-            print(line)
-        if '.stp' in line:
+            print(usdlink)
+        elif '.stp' in line:
             stplink = line
-            print(line)
-        if 'ERROR' in line:
+            print(stplink)
+        elif 'ERROR' in line:
             error = line
-            stplink = None
-            usdlink = None
-    return stdout, stderr, stplink, usdlink, error
+            usdlink = stplink = None
+    return stdout_lines, stderr_lines, stplink, usdlink, error
 
-def GetComponentNameFromStplink(stplink):
-    return str(stplink.split('/')[-1]).split('.')[0]
 
-def attachNewStringProperty(selection, property_name, property_value):
-    object_property_list = selection.PropertiesList
-    if property_name not in object_property_list:
-        selection.addProperty('App::PropertyString', property_name)
-        exec("selection."+property_name+"='"+str(property_value)+"'")
-    else:
-        exec("selection."+property_name+"='"+str(property_value)+"'")
-    # setting property as read-only!
-    exec("selection.setEditorMode('"+str(property_name)+"', 1)")
-    return selection
-
-def get_assembly_component_placement(type='base'):
-    # func to get list of valid (already uploaded to OV) assembly components position and rotation
-    doc = FreeCAD.ActiveDocument
-    valid_freecad_objects = [obj for obj in doc.Objects if hasattr(obj, 'Nucleus_link_usd')]
-    if type =='base':
-        placement = [tuple(obj.Placement.Base) for obj in valid_freecad_objects]
-    elif type == 'rotation':
-        placement = [tuple(obj.Placement.Rotation.getYawPitchRoll()) for obj in valid_freecad_objects] 
-    component_usd_links = [obj.Nucleus_link_usd  for obj in valid_freecad_objects]
-    return component_usd_links, placement
-
-def GetListOfAssemblyObjects(projectURL):
-    doc = FreeCAD.ActiveDocument
-    object_list = []
-    object_label_list = []
-    for obj in doc.Objects:
-        if 'Nucleus_link_usd' in dir(obj):
-            if clean_omniverse_path(projectURL) in str(obj.Nucleus_link_usd):
-                object_list.append(obj)
-                object_label_list.append(obj.Label)
-    return object_list, object_label_list
-
-### FRONTEND FUNCTIONS
 def _DownloadCmdWrapper(stplink, usdlink, token, custom_checkpoint=None):
+    """
+    Downloads a STEP file from Nucleus and attaches metadata to the imported object. Used by assembly mode only.
+    """
+    if not stplink:
+        return None
 
-    if stplink is not None:
-        GetAuthCheck(stplink,  filetype='stp')
-        print('Pulling from '+stplink)
-        ok, imported_object, output, error, fc_err = DownloadSTPFromNucleus(stplink, token = token, custom_checkpoint = custom_checkpoint)
-        output = output.split('\r\n')
-        for line in output:
-            print('OmniClient:', line)
-        print('ERRORS', error)
-        component_label = GetComponentNameFromStplink(stplink)
-        imported_object = attachNewStringProperty(imported_object, property_name = "Label", property_value = component_label)
-        imported_object = attachNewStringProperty(imported_object, property_name = "Nucleus_link_stp", property_value = stplink)
-        imported_object = attachNewStringProperty(imported_object, property_name = "Nucleus_link_usd", property_value = usdlink)
-        imported_object = attachNewStringProperty(imported_object, property_name = "Nucleus_version_id", property_value = token)
-        t = time.localtime()
-        current_time = time.strftime(" %d %b  %Y %H:%M:%S", t)
-        imported_object = attachNewStringProperty(imported_object, property_name = "Last_Nucleus_sync_time", property_value = current_time)       
-        return imported_object
+    GetAuthCheck(stplink, filetype='stp')
+    print(f'Pulling from {stplink}')
+    ok, obj, output, error, fc_err = DownloadSTPFromNucleus(stplink, token=token, custom_checkpoint=custom_checkpoint)
+    print('\n'.join(f'OmniClient: {line}' for line in output.split('\r\n')))
+    print('ERRORS', error)
+    label = GetComponentNameFromStplink(stplink)
+    properties = {
+        "Label": label,
+        "Nucleus_link_stp": stplink,
+        "Nucleus_link_usd": usdlink,
+        "Nucleus_version_id": token,
+        "Last_Nucleus_sync_time": time.strftime(" %d %b  %Y %H:%M:%S", time.localtime())
+    }
+
+    for key, val in properties.items():
+        obj = attachNewStringProperty(obj, property_name=key, property_value=val)
+
+    return obj
 
 class _DownloadCmd:
-    """Command to download from nucleus"""
+    """Command to download geometry from Nucleus."""
+
     def Activated(self):
-        # what is done when the command is clicked
         token = str(RandomTokenGenerator())
         usdlink = GetCurrentUSDLink()
         stplink = GetCurrentSTPLinkNoPrint()
 
-        if stplink is not None:
-            print('Pulling from '+stplink)
-            ok, imported_object, output, error, fc_err = DownloadSTPFromNucleus(stplink, token = token)
-            if ok==True:
-                output = output.split('\r\n')
-                for line in output:
-                    print('OmniClient:', line)
-                print('ERRORS', error)
-                component_label = GetComponentNameFromStplink(stplink)
+        if not stplink:
+            print('No STPLINK')
+            return None
+        print(f'Pulling from {stplink}')
+        ok, obj, output, error, fc_err = DownloadSTPFromNucleus(stplink, token=token)
 
-                imported_object = attachNewStringProperty(imported_object, property_name = "Label", property_value = component_label)
-                imported_object = attachNewStringProperty(imported_object, property_name = "Nucleus_link_stp", property_value = stplink)
-                imported_object = attachNewStringProperty(imported_object, property_name = "Nucleus_link_usd", property_value = usdlink)
-                imported_object = attachNewStringProperty(imported_object, property_name = "Nucleus_version_id", property_value = token)
-                t = time.localtime()
-                current_time = time.strftime(" %d %b  %Y %H:%M:%S", t)
-                imported_object = attachNewStringProperty(imported_object, property_name = "Last_Nucleus_sync_time", property_value = current_time)       
-            if ok==False:
-                msgBox = QtGui.QMessageBox()
-                msgBox.setIcon(QtGui.QMessageBox.Critical)
-                msgBox.setText(fc_err)
-                msgBox.setWindowTitle('Omniverse Connector for FreeCAD')
-                msgBox.exec_()
+        if ok:
+            print('\n'.join(f'OmniClient: {line}' for line in output.split('\r\n')))
+            print('ERRORS', error)
+            label = GetComponentNameFromStplink(stplink)
+            props = {
+                "Label": label,
+                "Nucleus_link_stp": stplink,
+                "Nucleus_link_usd": usdlink,
+                "Nucleus_version_id": token,
+                "Last_Nucleus_sync_time": time.strftime(" %d %b  %Y %H:%M:%S", time.localtime())
+            }
+            for key, val in props.items():
+                obj = attachNewStringProperty(obj, property_name=key, property_value=val)
+        else:
+            QtGui.QMessageBox.critical(
+                None,
+                'Omniverse Connector for FreeCAD',
+                fc_err
+            )
 
     def GetResources(self):
-        # icon and command information
-        MenuText = QtCore.QT_TRANSLATE_NOOP(
-            'OVconnect_pull_from_nucleus',
-            'Pull from Nucleus')
-        ToolTip = QtCore.QT_TRANSLATE_NOOP(
-            'OVconnect_pull_from_nucleus',
-            'Pulls geometry from Omniverse Nucleus')
         return {
             'Pixmap': __dir__ + '/icons/OVConnect_pull.svg',
-            'MenuText': MenuText,
-            'ToolTip': ToolTip}
+            'MenuText': QtCore.QT_TRANSLATE_NOOP('OVconnect_pull_from_nucleus', 'Pull from Nucleus'),
+            'ToolTip': QtCore.QT_TRANSLATE_NOOP('OVconnect_pull_from_nucleus', 'Pulls geometry from Omniverse Nucleus')
+        }
 
     def IsActive(self):
-        usd_URL= GetCurrentUSDLinkNoPrint() 
-        usd_permission= GetCurrentUSDPermissions()
+        def is_valid(url_func, perm_func):
+            return perm_func() == 'OK_ACCESS' and url_func() is not None
 
-        stp_permission = GetCurrentSTPPermissions()
-        stp_URL = GetCurrentSTPLinkNoPrint()
-
-        is_stpPermissionOK = stp_permission == 'OK_ACCESS'
-        is_stpURLExists = stp_URL!= None
-        is_stpSideValid = is_stpPermissionOK ==True and is_stpURLExists==True
-
-        is_usdPermissionOK = usd_permission == 'OK_ACCESS'
-        is_usdURLExists = usd_URL!= None
-        is_usdSideValid = is_usdPermissionOK==True and is_usdURLExists==True
-
-        is_activeDocumentExists = not FreeCAD.ActiveDocument is None
-
-        is_checksValid = is_activeDocumentExists == True and is_stpSideValid==True and is_usdSideValid==True
-        return is_checksValid
+        return (
+            FreeCAD.ActiveDocument is not None and
+            is_valid(GetCurrentSTPLinkNoPrint, GetCurrentSTPPermissions) and
+            is_valid(GetCurrentUSDLinkNoPrint, GetCurrentUSDPermissions)
+        )
 
 class _ClearJunkCmd:
     """
+    Deprecated class, cleanup of temp data is now done automatically.
     Command to clear session data
     """
     def Activated(self):
@@ -625,120 +649,86 @@ class _ClearJunkCmd:
         return not FreeCAD.ActiveDocument is None
 
 class _UploadCmd:
-    """Command to upload a selected component to nucleus"""
+    """Button to upload a selected component to Nucleus."""
     def Activated(self):
-        selection =GetCurrentSelection()
-        if selection != None:
-            usdlink_local = GetCurrentUSDLinkNoPrint()
-            stplink_local = GetCurrentSTPLinkNoPrint()
+        selection = GetCurrentSelection()
+        if not selection:
+            return
 
-            usd_link_is_exist_on_fc = 'Nucleus_link_usd' in selection.PropertiesList
-            stp_link_is_exist_on_fc = 'Nucleus_link_stp' in selection.PropertiesList
+        usd_local, stp_local = GetCurrentUSDLinkNoPrint(), GetCurrentSTPLinkNoPrint()
+        token = str(RandomTokenGenerator())
 
-            if usd_link_is_exist_on_fc==True and stp_link_is_exist_on_fc==True:
-                usdlink_fcvar = selection.Nucleus_link_usd
-                stplink_fcvar = selection.Nucleus_link_stp
+        # Resolve potential link conflicts
+        def resolve_link_conflict(label, local, stored):
+            if local == stored:
+                return local
+            options = [stored, local]
+            choice, ok = QtGui.QInputDialog.getItem(None, "Omniverse Connector for FreeCAD",
+                                                    f'Found conflict in Nucleus {label} links. Select one to push to:',
+                                                    options, 0, False)
+            return choice if ok else None
 
-                if usdlink_fcvar !=usdlink_local or stplink_fcvar != stplink_local:
-                    
-                    stplink_list = [stplink_fcvar, stplink_local]
-                    usdlink_list = [usdlink_fcvar, usdlink_local]
+        if 'Nucleus_link_usd' in selection.PropertiesList and 'Nucleus_link_stp' in selection.PropertiesList:
+            usd_fc, stp_fc = selection.Nucleus_link_usd, selection.Nucleus_link_stp
+            usdlink = resolve_link_conflict("USD", usd_local, usd_fc)
+            stplink = resolve_link_conflict("STP", stp_local, stp_fc)
+            if not usdlink or not stplink:
+                QtGui.QMessageBox.critical(None, "Omniverse Connector for FreeCAD", "Failed to push to Nucleus!")
+                return
+        else:
+            usdlink, stplink = usd_local, stp_local
 
-                    if stplink_fcvar!=stplink_local:
-                        dialog_txt = 'Found conflict in Nucleus STP links. Select the desired STP link to push to:'
-                        item, ok = QtGui.QInputDialog.getItem(QtGui.QWidget(), "Omniverse Connector for FreeCAD", dialog_txt, stplink_list, 0, False)
-                        if ok and item:
-                            stplink = item
-                            usdlink = usdlink_list[stplink_list.index(item)]
-                        else:
-                            msgBox = QtGui.QMessageBox()
-                            msgBox.setIcon(QtGui.QMessageBox.Question)
-                            msgBox.setText("Failed to push to Nucleus!")
-                            msgBox.exec_()
+        # Upload USD
+        if usdlink:
+            print(f'Pushing {selection.Name} to {usdlink}')
+            output, error = UploadUSDToNucleus(usdlink, selection, token=token)
+            print('\n'.join(f'OmniClient {line}' for line in output.split('\r\n')))
+            print('ERRORS', error)
+            selection = attachNewStringProperty(selection, "Nucleus_link_usd", usdlink)
 
-                    elif usdlink_fcvar!=usdlink_local:
-                        dialog_txt = 'Found conflict in Nucleus USD links. Select the desired USD link to push to:'
-                        item, ok = QtGui.QInputDialog.getItem(QtGui.QWidget(), "Omniverse Connector for FreeCAD", dialog_txt, usdlink_list, 0, False)
-                        if ok and item:
-                            stplink = item
-                            usdlink = stplink_list[usdlink_list.index(item)]
-                        else:
-                            msgBox = QtGui.QMessageBox()
-                            msgBox.setIcon(QtGui.QMessageBox.Question)
-                            msgBox.setText("Failed to push to Nucleus!")
-                            msgBox.exec_()
-                else:
-                    usdlink= usdlink_fcvar
-                    stplink = stplink_fcvar
-            else:
-                usdlink = usdlink_local
-                stplink = stplink_local
-            token = str(RandomTokenGenerator())
-            if usdlink is not None:
-                if selection is not None:
-                    print('Pushing '+str(selection.Name)+' to '+usdlink)
-                    output, error = UploadUSDToNucleus(usdlink, selection, token = token)
-                    output = output.split('\r\n')
-                    for line in output:
-                        print('OmniClient', line)
-                    print('ERRORS', error)
-                    selection = attachNewStringProperty(selection, property_name = "Nucleus_link_usd", property_value = usdlink)
-            if stplink is not None:
-                if selection is not None:
-                    print('Pushing '+str(selection.Name)+' to '+stplink)
-                    output, error = UploadSTPToNucleus(stplink, selection, token = token)
-                    output = output.split('\r\n')
-                    for line in output:
-                        print('OmniClient', line)
-                    print('ERRORS', error)
-                    t = time.localtime()
-                    current_time = time.strftime(" %d %b %Y %H:%M:%S", t)
-                    component_label = GetComponentNameFromStplink(stplink)
+        # Upload STP
+        if stplink:
+            print(f'Pushing {selection.Name} to {stplink}')
+            output, error = UploadSTPToNucleus(stplink, selection, token=token)
+            print('\n'.join(f'OmniClient {line}' for line in output.split('\r\n')))
+            print('ERRORS', error)
+            props = {
+                "Label": GetComponentNameFromStplink(stplink),
+                "Nucleus_link_stp": stplink,
+                "Nucleus_version_id": token,
+                "Last_Nucleus_sync_time": time.strftime(" %d %b %Y %H:%M:%S", time.localtime())
+            }
+            for k, v in props.items():
+                selection = attachNewStringProperty(selection, k, v)
 
-                    selection = attachNewStringProperty(selection, property_name = "Label", property_value = component_label)
-                    selection = attachNewStringProperty(selection, property_name = "Last_Nucleus_sync_time", property_value = current_time)
-                    selection = attachNewStringProperty(selection, property_name = "Nucleus_link_stp", property_value = stplink)
-                    selection = attachNewStringProperty(selection, property_name = "Nucleus_version_id", property_value = token)
-            if 'is_enabled_secondary_usdlink' in dir(FreeCAD):
-                if FreeCAD.is_enabled_secondary_usdlink == True:
-                    FreeCAD.secondary_usdlink = GetCurrentUSDLinkNoPrint(secondary=True)
-                    output, error = DirectUploadUSDToNucleus(FreeCAD.secondary_usdlink, selection, token = token)
-                    output = output.split('\r\n')
-                    for line in output:
-                        print('OmniClient ', line)
-                    print('ERRORS ', error)
+        # Upload to secondary USD if enabled
+        if getattr(FreeCAD, 'is_enabled_secondary_usdlink', False):
+            secondary_usd = GetCurrentUSDLinkNoPrint(secondary=True)
+            output, error = UploadUSDToNucleus(secondary_usd, selection, token=token, overwrite_history=True, secondary=True)
+            print('\n'.join(f'OmniClient {line}' for line in output.split('\r\n')))
+            print('ERRORS', error)
 
     def GetResources(self):
-        MenuText = QtCore.QT_TRANSLATE_NOOP(
-            'OVconnect_push_to_nucleus',
-            'Push to Nucleus')
-        ToolTip = QtCore.QT_TRANSLATE_NOOP(
-            'OVconnect_push_to_nucleus',
-            'Pushes selected geometry to Omniverse Nucleus')
         return {
             'Pixmap': __dir__ + '/icons/OVConnect_push.svg',
-            'MenuText': MenuText,
-            'ToolTip': ToolTip}
+            'MenuText': QtCore.QT_TRANSLATE_NOOP('OVconnect_push_to_nucleus', 'Push to Nucleus'),
+            'ToolTip': QtCore.QT_TRANSLATE_NOOP('OVconnect_push_to_nucleus', 'Pushes selected geometry to Omniverse Nucleus')
+        }
 
     def IsActive(self):
-        # Upload button only active when: STPlink and USDlink has been saved, permission to both are OK, and there is an active document on freecad
-        usd_permission = GetCurrentUSDPermissions()
-        usd_URL = GetCurrentUSDLinkNoPrint()
-        stp_permission = GetCurrentSTPPermissions()
-        stp_URL = GetCurrentSTPLinkNoPrint()
-        is_stpPermissionOK = stp_permission == 'OK_ACCESS'
-        is_stpURLExists = stp_URL!= None
-        is_stpSideValid = is_stpPermissionOK ==True and is_stpURLExists==True
-        is_usdPermissionOK = usd_permission == 'OK_ACCESS'
-        is_usdURLExists = usd_URL!= None
-        is_usdSideValid = is_usdPermissionOK==True and is_usdURLExists==True
-        is_activeDocumentExists = not FreeCAD.ActiveDocument is None
-        is_checksValid = is_activeDocumentExists == True and is_stpSideValid==True and is_usdSideValid==True
-        return is_checksValid
+        def is_valid(url_func, perm_func):
+            return perm_func() == 'OK_ACCESS' and url_func() is not None
+
+        return (
+            FreeCAD.ActiveDocument is not None and
+            is_valid(GetCurrentSTPLinkNoPrint, GetCurrentSTPPermissions) and
+            is_valid(GetCurrentUSDLinkNoPrint, GetCurrentUSDPermissions)
+        )
+
 
 class _CheckConnectionCmd:
     """DEPRECATED CLASS!
-    placeholder command to test user authetication - this is now automated"""
+    placeholder command to test user authentication - this is now automated"""
     def Activated(self):
         # what is done when the command is clicked
         usdlink = GetCurrentUSDLink()
@@ -837,7 +827,10 @@ class AssemblyChecklistDialog(QtGui.QDialog):
             item = self.model.item(i)
             item.setCheckState(QtCore.Qt.Unchecked)
 
-def live_get_available_sessions(usdlink):
+def GetAvailableLiveSessions(usdlink):
+    """
+    Returns available live sessions for a given USD file on Nucleus.
+    """
     doc = FreeCAD.ActiveDocument
     FreeCAD.setActiveDocument(doc.Name)
     error_code = None
@@ -870,426 +863,203 @@ def live_get_available_sessions(usdlink):
     return success, list_of_sessions, error_code
 
 class OmniverseAssemblyPanel:
-    def __init__(self,widget):
-
+    """
+    Assembly Panel mega-class. This class handles moving of assembly, handling of live assembly, pushing/pulling, etc.
+    """
+    def __init__(self, widget):
         self.form = widget
-        self.layout = QtGui.QVBoxLayout()
+        self.layout = QtGui.QVBoxLayout(widget)
         self.currentProjectURL = GetCurrentProjectLinkNoPrint()
-        self.isLive = False
+        self.assemblyUSDLink = getattr(FreeCAD, 'assembly_usd_link', None)
+        self.proc = None
+        self.valid_freecad_objects = [obj for obj in FreeCAD.ActiveDocument.Objects if hasattr(obj, 'Nucleus_link_usd')]
+        self._build_ui()
 
-        self.panel_name_text = QtGui.QLabel('Assembly Panel')
-        self.current_project_name_text = QtGui.QLabel(' \u2705 Current project: '+ str(self.currentProjectURL))
-
-        self.assemblyUSDLink = None
-
-        if not hasattr(FreeCAD, 'assembly_usd_link'):
-            FreeCAD.assembly_usd_link = None
-
-        if FreeCAD.assembly_usd_link != None:
-            self.status_header_text = QtGui.QLabel(' Status: \u2705 Ready')
-            self.current_assembly_URL_text = QtGui.QLabel(' \u2705 Current assembly: '+ str(FreeCAD.assembly_usd_link.split('/')[-1]))
-        else:
-            self.status_header_text = QtGui.QLabel(' Status: \u274c')
-            self.current_assembly_URL_text = QtGui.QLabel(' \u274c No assembly selected.')
-        # self.current_assembly_URL_text = 
-        
-        self.create_new_assembly_button = QtGui.QPushButton("Make assembly from workspace objects")
-        self.create_new_assembly_button.clicked.connect(self.flow_create_new_assembly)
-
-        self.open_existing_assembly_button = QtGui.QPushButton("Import existing assembly into workspace")
-        self.open_existing_assembly_button.clicked.connect(self.flow_open_existing_assembly)
-
+    def _build_ui(self):
+        self.status_label = QtGui.QLabel(' Status: \u2705 Ready' if self.assemblyUSDLink else ' Status: \u274c')
+        current_assembly = self.assemblyUSDLink.split('/')[-1] if self.assemblyUSDLink else 'No assembly selected'
+        self.assy_label = QtGui.QLabel(f' \u2705 Current assembly: {current_assembly}' if self.assemblyUSDLink else f' \u274c {current_assembly}')
+        project_label = QtGui.QLabel(f' \u2705 Current project: {self.currentProjectURL}')
+        buttons = [
+            ("Make assembly from workspace objects", self.flow_create_new_assembly),
+            ("Import existing assembly into workspace", self.flow_open_existing_assembly),
+            ("Upload assembly changes", self.flow_upload_assembly_changes),
+            ("Fetch new assembly changes", self.flow_download_assembly_changes),
+        ]
+        for text, func in buttons:
+            btn = QtGui.QPushButton(text); btn.clicked.connect(func); self.layout.addWidget(btn)
         self.live_mode_button = QtGui.QPushButton("(EXPERIMENTAL) Live assembly mode")
         self.live_mode_button.setCheckable(True)
         self.live_mode_button.clicked.connect(self.flow_start_live_assy_mode)
+        for w in [QtGui.QLabel("Assembly Panel"), self.status_label, project_label, self.assy_label, self.live_mode_button]:
+            self.layout.addWidget(w)
 
-        self.upload_assy_changes_button = QtGui.QPushButton("Upload assembly changes")
-        self.upload_assy_changes_button.clicked.connect(self.flow_upload_assembly_changes)
-
-        self.download_assy_changes_button = QtGui.QPushButton("Fetch new assembly changes")
-        self.download_assy_changes_button.clicked.connect(self.flow_download_assembly_changes)
-
-        # LIVE ASSY DECLARATIONS
-        self.proc = None
-        doc = FreeCAD.ActiveDocument
-        self.valid_freecad_objects = [obj for obj in doc.Objects if hasattr(obj, 'Nucleus_link_usd')]
-
-        self.layout.addWidget(self.panel_name_text)
-        self.layout.addWidget(self.create_new_assembly_button)
-        self.layout.addWidget(self.open_existing_assembly_button)
-
-        self.layout.addWidget(self.status_header_text)
-        self.layout.addWidget(self.current_project_name_text)
-        self.layout.addWidget(self.current_assembly_URL_text)
-
-        self.layout.addWidget(self.upload_assy_changes_button)
-        self.layout.addWidget(self.download_assy_changes_button)
-        self.layout.addWidget(self.live_mode_button) # comment this out to disable experimental
-        self.form.setLayout(self.layout)
-
-    def add_new_live_layout(self):
-        live_layout = QtGui.QVBoxLayout()
-        self.kill_live_process_button = QtGui.QPushButton("Stop live sync")
-        self.kill_live_process_button.clicked.connect(self.kill_live_process())
-        live_layout.addWidget(self.kill_live_process_button)
-        self.layout.addItem(live_layout)
+    def _warn(self, msg):
+        print('[WARN]', msg)
+        box = QtGui.QMessageBox(); box.setIcon(QtGui.QMessageBox.Warning)
+        box.setText(msg); box.exec_()
 
     def flow_create_new_assembly(self):
-        uploaded_components_list, uploaded_components_label_list = GetListOfAssemblyObjects(self.currentProjectURL)
-        if uploaded_components_list != []:
-            form = AssemblyChecklistDialog('Create new assembly', uploaded_components_label_list, checked=True)
-            if form.exec_() == QtGui.QDialog.Accepted:
-                selected_object_label_list = form.choices
-                self.assembly_name = form.assembly_name
-                if self.assembly_name !='':
-                    if text_follows_rules(self.assembly_name) ==True:
-                        self.selected_objects = GetSelectedAssemblyObjects(uploaded_components_list, uploaded_components_label_list, selected_object_label_list)
-                        print(self.assembly_name)
-                        for obj in self.selected_objects:
-                            print(obj.Label, obj.Nucleus_link_usd, obj.Nucleus_link_stp)
-                        self.assembly_items_usd_links = [obj.Nucleus_link_usd for obj in self.selected_objects]
-                        self.assembly_items_stp_links = [obj.Nucleus_link_stp for obj in self.selected_objects]
-                        shared_token = str(RandomTokenGenerator())
-                        stdout, stderr, assembly_usd_link = CreateNewAssemblyOnNucleus(self.currentProjectURL, 
-                            assembly_name = self.assembly_name, 
-                            assembly_items_usd_links=self.assembly_items_usd_links, 
-                            assembly_items_stp_links=self.assembly_items_stp_links, 
-                            token = shared_token)
-
-                        for line in stdout:
-                            print('OmniClient', line)
-                        for line in stderr:
-                            print('ERRORS', line)
-                        custom_checkpoint_message = 'Add asset to assembly in ' + assembly_usd_link.split('/')[-1]
-                        for usd_link in self.assembly_items_usd_links:
-                            AddCheckpointToUSDOnNucleus(usd_link, custom_checkpoint=custom_checkpoint_message, token=shared_token)
-
-                        print(assembly_usd_link)
-                        FreeCAD.assembly_usd_link = assembly_usd_link
-                        self.current_assembly_URL_text.setText(' \u2705 Current assembly: '+FreeCAD.assembly_usd_link.split('/')[-1])
-                        
-                        self.status_header_text.setText(' Status: \u2705 Ready')
-
-                    else:
-                        msgBox = QtGui.QMessageBox()
-                        msgBox.setIcon(QtGui.QMessageBox.Warning)
-                        msgBox.setText("Assembly name must start with a letter. \nIt can contain letters, digits, or underscores, and cannot contain spaces.")
-                        msgBox.exec_()
-                        self.flow_create_new_assembly()
-
-                else:
-                    msgBox = QtGui.QMessageBox()
-                    msgBox.setIcon(QtGui.QMessageBox.Warning)
-                    msgBox.setText("No assembly name inputted!\nAssembly name must start with a letter. \nIt can contain letters, digits, or underscores, and cannot contain spaces.")
-                    msgBox.exec_()
-                    self.flow_create_new_assembly()
-        else:
-            print('[WARN] No components in the current workspace have been pushed to this project! Push each item to Nucleus and try again.')
-            msgBox = QtGui.QMessageBox()
-            msgBox.setIcon(QtGui.QMessageBox.Critical)
-            msgBox.setText("No components in the current workspace have been pushed to this project! \nPush each item to Nucleus and try again.")
-            msgBox.exec_()
+        objs, labels = GetListOfAssemblyObjects(self.currentProjectURL)
+        if not objs: return self._warn("No pushed components found!")
+        form = AssemblyChecklistDialog("Create new assembly", labels, checked=True)
+        if not form.exec_(): return
+        name = form.assembly_name
+        if not name or not text_follows_rules(name): return self._warn("Invalid assembly name")
+        selected = GetSelectedAssemblyObjects(objs, labels, form.choices)
+        usd_links = [o.Nucleus_link_usd for o in selected]
+        stp_links = [o.Nucleus_link_stp for o in selected]
+        token = str(RandomTokenGenerator())
+        out, err, link = CreateNewAssemblyOnNucleus(self.currentProjectURL, name, usd_links, stp_links, token)
+        print('\n'.join(out + err))
+        for usd in usd_links:
+            AddCheckpointToNucleusAsset(usd, f"Add asset to assembly in {link.split('/')[-1]}", token)
+        FreeCAD.assembly_usd_link = link
+        self.assy_label.setText(f' \u2705 Current assembly: {link.split("/")[-1]}')
+        self.status_label.setText(' Status: \u2705 Ready')
 
     def flow_open_existing_assembly(self):
-        stdout, stderr, self.existing_assembly_usd_links = FindExistingAssembliesOnNucleus(self.currentProjectURL)
-        if self.existing_assembly_usd_links != None:
-            assembly_usd_names = [assy_usdlink.split('/')[-1] for assy_usdlink in self.existing_assembly_usd_links]
-            print(self.existing_assembly_usd_links)
-            dialog_txt = 'Select an existing assembly to import:'
-            assembly_name, ok = QtGui.QInputDialog.getItem(self.form, "Omniverse Connector for FreeCAD", dialog_txt, assembly_usd_names, 0, False)
-            if ok and assembly_name:
-                print(assembly_name)
-                selected_assembly_usd_link = [usdlink for usdlink in self.existing_assembly_usd_links if assembly_name in usdlink][0]
-                print(selected_assembly_usd_link)
-                FreeCAD.assembly_usd_link = selected_assembly_usd_link
-                shared_token = str(RandomTokenGenerator())
+        out, err, links = FindExistingAssembliesOnNucleus(self.currentProjectURL)
+        if not links: return self._warn("No existing assemblies found.")
+        names = [l.split('/')[-1] for l in links]
+        name, ok = QtGui.QInputDialog.getItem(self.form, "Select assembly", "Import:", names, 0, False)
+        if not ok: return
+        link = next(l for l in links if name in l)
+        FreeCAD.assembly_usd_link = link
+        token = str(RandomTokenGenerator())
+        _, _, data = GetPrimReferenceXForms(link, token)
+        for d in data:
+            print(d['step-path'])
+        for d in data:
+            obj = _DownloadCmdWrapper(d['step-path'], d['ref-path'], token, f"Imported as {name}")
+            obj.Placement.Base = FreeCAD.Vector(d['transform'])
+            obj.Placement.Rotation = FreeCAD.Rotation(*d['rot-xyz'][::-1])
+        AddCheckpointToNucleusAsset(link, "Imported assembly into FreeCAD", token)
+        self.assy_label.setText(f' \u2705 Current assembly: {link.split("/")[-1]}')
+        self.status_label.setText(' Status: \u2705 Ready')
 
-                start_fetch_xform = time.time()
-                stdout, stderr, prim_data =  GetPrimReferenceXForms(selected_assembly_usd_link, token = shared_token)
-                print(prim_data)
-                
-                for dict_entry in prim_data:
-                    stplink = dict_entry['step-path']
-                    usdlink = dict_entry['ref-path']
-                    start_fetch_geom = time.time()
-                    rotation = dict_entry['rot-xyz'][::-1]
-                    custom_checkpoint_message = 'Imported assembly into FreeCAD as part of '+ str(assembly_name)
-                    imported_obj = _DownloadCmdWrapper(stplink, usdlink, shared_token, custom_checkpoint = custom_checkpoint_message)
-                    imported_obj.Placement.Base = FreeCAD.Vector(dict_entry['transform'])
-                    imported_obj.Placement.Rotation = FreeCAD.Rotation(*rotation)
-                    print('[INFO] Moving and rotating ', str(imported_obj.Label), 'to ', dict_entry['transform'], rotation)
-                    # print('FETCH SINGLE COMPONENT:', time.time()-start_fetch_geom, 's.')
-
-                custom_checkpoint_message = 'Imported assembly into FreeCAD'
-                AddCheckpointToUSDOnNucleus(FreeCAD.assembly_usd_link, custom_checkpoint=custom_checkpoint_message, token=shared_token)
-                self.current_assembly_URL_text.setText(' \u2705 Current assembly: '+FreeCAD.assembly_usd_link.split('/')[-1])
-                self.status_header_text.setText(' Status: \u2705 Ready')
-        else:
-            print('[WARN] No existing assemblies found for this project!')
-            msgBox = QtGui.QMessageBox()
-            msgBox.setIcon(QtGui.QMessageBox.Critical)
-            msgBox.setText("No existing assemblies found for this project!")
-            msgBox.exec_()
     def flow_upload_assembly_changes(self):
-        #func to update assembly positions on nucleus
-        if FreeCAD.assembly_usd_link!= None:
-            assembly_usd_link = FreeCAD.assembly_usd_link
+        link = getattr(FreeCAD, 'assembly_usd_link', None)
+        if not link: return self._warn("No assembly link found.")
+        usd_links, pos = get_assembly_component_placement('base')
+        _, rot = get_assembly_component_placement('rotation')
+        MoveAssemblyXformPositions(link, usd_links, pos, rot, token=str(RandomTokenGenerator()))
 
-            component_usd_links, base_placement = get_assembly_component_placement(type='base')
-            component_usd_links, rotation_placement = get_assembly_component_placement(type='rotation')
-            token = str(RandomTokenGenerator())
-
-            stdout, stderr = MoveAssemblyXformPositions(assembly_usd_link, component_usd_links, base_placement, rotation_placement, token = token)
-
-        else:
-            print('[WARN] No assembly link for this project specified to push to!')
-            msgBox = QtGui.QMessageBox()
-            msgBox.setIcon(QtGui.QMessageBox.Warning)
-            msgBox.setText("No assembly link for this project specified to push to!")
-            msgBox.exec_()
-        return None
     def flow_download_assembly_changes(self):
-        if FreeCAD.assembly_usd_link!= None:
-            doc = FreeCAD.ActiveDocument
-            assembly_usd_link = FreeCAD.assembly_usd_link
-            token = str(RandomTokenGenerator())
-            start_fetch_xform = time.time()
-            stdout, stderr, prim_data =  GetPrimReferenceXForms(assembly_usd_link, token = token)
-            print('FETCH COMPONENT XFORM:', time.time()-start_fetch_xform, 's.')
-            valid_freecad_objects = [obj for obj in doc.Objects if hasattr(obj, 'Nucleus_link_stp')]
-            for dict_entry in prim_data:
-                stplink = dict_entry['step-path']
-                usdlink = dict_entry['ref-path']
-                rotation = dict_entry['rot-xyz'][::-1]
-                freecad_object = [obj for obj in valid_freecad_objects if obj.Nucleus_link_usd == usdlink][0]
-                freecad_object.Placement.Base = FreeCAD.Vector(dict_entry['transform'])
-                freecad_object.Placement.Rotation = FreeCAD.Rotation(*rotation)
-                print('[INFO] Moving and rotating ', str(freecad_object.Label), 'to ', dict_entry['transform'], rotation)
-
-        else:
-            print('[WARN] No assembly link specified to fetch from!')
-            msgBox = QtGui.QMessageBox()
-            msgBox.setIcon(QtGui.QMessageBox.Warning)
-            msgBox.setText("No assembly link specified to fetch from!")
-            msgBox.exec_()
-        return None
-
+        link = getattr(FreeCAD, 'assembly_usd_link', None)
+        if not link: return self._warn("No assembly link specified.")
+        token = str(RandomTokenGenerator())
+        _, _, data = GetPrimReferenceXForms(link, token)
+        valid_objs = [o for o in FreeCAD.ActiveDocument.Objects if hasattr(o, 'Nucleus_link_usd')]
+        for d in data:
+            obj = next(o for o in valid_objs if o.Nucleus_link_usd == d['ref-path'])
+            obj.Placement.Base = FreeCAD.Vector(d['transform'])
+            obj.Placement.Rotation = FreeCAD.Rotation(*d['rot-xyz'][::-1])
 
     def flow_start_live_assy_mode(self):
-        # function to start live assembly mode (Omni > FreeCAD only at current state)
-        if self.live_mode_button.isChecked():
-            if FreeCAD.assembly_usd_link !=None:
-                success, list_of_sessions, error_code = live_get_available_sessions(FreeCAD.assembly_usd_link)
-                print('SUCCESS:', success)
-                print('List of sessions:', list_of_sessions)
-                print('Error code:', error_code)
-                if success==True:
-                    dialog_txt = 'Select available sessions'
-                    session_name, ok = QtGui.QInputDialog.getItem(self.form, "Omniverse Connector for FreeCAD", dialog_txt, list_of_sessions, 0, False)
-                    if ok and session_name:
-                        cmd = get_qproc_command_start_live(FreeCAD.assembly_usd_link, session_name)
-                        if self.proc is None:
-                            self.live_mode_button.setText('(EXPERIMENTAL) Live assembly mode ACTIVE')
-                            print('Starting live sync..')
-                            print(cmd)
-                            self.proc = QtCore.QProcess()  # Keep a reference to the QProcess (e.g. on self) while it's running.
-                            self.proc.readyReadStandardOutput.connect(self.move_components_on_stdout)
-                            self.proc.readyReadStandardError.connect(self.handle_stderr)
-                            self.proc.stateChanged.connect(self.handle_state)
-                            self.proc.finished.connect(self.process_finished)  # Clean up once complete.
-                            self.proc.start("powershell", [cmd])
-                    else:
-                        self.live_mode_button.setChecked(False)
-                        print('[WARN] No live sessions selected!')
-                        msgBox = QtGui.QMessageBox()
-                        msgBox.setIcon(QtGui.QMessageBox.Warning)
-                        msgBox.setText("No live sessions selected!")
-                        msgBox.exec_()
+        if not self.live_mode_button.isChecked():
+            self.live_mode_button.setText("(EXPERIMENTAL) Live assembly mode")
+            return self.kill_live_process()
+        link = getattr(FreeCAD, 'assembly_usd_link', None)
+        if not link: return self._warn("No assembly link specified.")
+        success, sessions, _ = GetAvailableLiveSessions(link)
+        if not success: return self._warn("No live sessions found.")
+        session, ok = QtGui.QInputDialog.getItem(self.form, "Select session", "Available:", sessions, 0, False)
+        if not ok: return
+        self.live_mode_button.setText("(EXPERIMENTAL) Live assembly mode ACTIVE")
+        self.proc = QtCore.QProcess()
+        self.proc.readyReadStandardOutput.connect(self.move_components_on_stdout)
+        self.proc.readyReadStandardError.connect(lambda: print(str(self.proc.readAllStandardError())))
+        self.proc.stateChanged.connect(lambda s: print(f"State: {['Not running','Starting','Running'][s]}"))
+        self.proc.finished.connect(lambda: setattr(self, 'proc', None))
+        self.proc.start("powershell", [make_live_start_command(link, session)])
 
-                elif success==False:
-                    self.live_mode_button.setChecked(False)
-                    print('[WARN] No live sessions found!')
-                    msgBox = QtGui.QMessageBox()
-                    msgBox.setIcon(QtGui.QMessageBox.Warning)
-                    msgBox.setText("No live sessions found!")
-                    msgBox.exec_()
-            else:
-                self.live_mode_button.setChecked(False)
-                print('[WARN] No assembly link specified!')
-                msgBox = QtGui.QMessageBox()
-                msgBox.setIcon(QtGui.QMessageBox.Warning)
-                msgBox.setText("No assembly link specified!")
-                msgBox.exec_()
-        else:
-            self.live_mode_button.setText('(EXPERIMENTAL) Live assembly mode')
-            print('Exiting live session process...')
-            self.kill_live_process()
+    def move_components_on_stdout(self):
+        lines = str(self.proc.readAllStandardOutput())
+        if self.currentProjectURL not in lines: return
+        entries = [e.strip() for e in lines.split('|') if e]
+        for i in range(0, len(entries), 3):
+            usd, t, r = entries[i:i+3]
+            obj = next(o for o in self.valid_freecad_objects if o.Nucleus_link_usd == usd)
+            obj.Placement.Base = FreeCAD.Vector(ast.literal_eval(t))
+            obj.Placement.Rotation = FreeCAD.Rotation(*ast.literal_eval(r)[::-1])
 
     def kill_live_process(self):
-        if self.proc is not None:
-            print('Sending quit command to live session ...')
-            quit_cmd = 'q'
-            quit_cmd = bytes(str(quit_cmd)+'\n', 'utf-8')
-            self.proc.write(quit_cmd)
+        if self.proc:
+            self.proc.write(bytes("q\n", 'utf-8'))
             self.proc.waitForReadyRead()
             self.proc.closeWriteChannel()
             self.proc.waitForFinished()
-            print('Sent quit command to process.')
-    def handle_stderr(self):
-        data = self.proc.readAllStandardError()
-        stderr = bytes(data).decode("utf8")
-        print(stderr)
+            print("Live session terminated.")
 
-    def handle_stdout(self):
-        data = self.proc.readAllStandardOutput()
-        stdout = bytes(data).decode("utf8")
-        print(stdout)
+def MoveAssemblyXformPositions(assembly_url, usd_links, translations, rotations, token=None):
+    """
+    Function to send a message to Nucleus to move objects in an assembly. Only used for batch assembly workflow.
+    """
+    batch_path = os.path.join(GetFetcherScriptsDirectory().replace(" ", "` "), GetBatchFileName())
+    cmd = f'{batch_path} --nucleus_url {assembly_url} --move_assembly ' \
+          f'--set_rot_xyz {parse_list_into_set_srt_command_arg(rotations)} ' \
+          f'--set_transform {parse_list_into_set_srt_command_arg(translations)} ' \
+          f'--asset_usd_links {" ".join(usd_links)}'
 
-    def handle_state(self, state):
-        states = {
-            QtCore.QProcess.NotRunning: 'Not running',
-            QtCore.QProcess.Starting: 'Starting',
-            QtCore.QProcess.Running: 'Running',
-        }
-        state_name = states[state]
-        print(f"State changed: {state_name}")
+    if token:
+        cmd += f' --token {token}'
 
-    def process_finished(self):
-        print("Process finished.")
-        self.proc = None
-
-    def move_components_on_stdout(self):
-        line = self.proc.readAllStandardOutput()
-        line = bytes(line).decode("utf8")
-        # print(line)
-        if self.currentProjectURL in line:
-            downstream_data = line.split('|')
-            downstream_data = [data.strip() for data in downstream_data][:-1]
-            downstream_data_list = [{'ref-path': downstream_data[i], 'transform': ast.literal_eval(downstream_data[i + 1]),'rot-xyz': ast.literal_eval(downstream_data[i + 2])} for i in range(0, len(downstream_data), 3)]
-            for downstream_entry in downstream_data_list:
-                usdlink = downstream_entry['ref-path']
-                rotation = downstream_entry['rot-xyz'][::-1]
-                freecad_object = [obj for obj in self.valid_freecad_objects if obj.Nucleus_link_usd == usdlink][0]
-                freecad_object.Placement.Base = FreeCAD.Vector(downstream_entry['transform'])
-                freecad_object.Placement.Rotation = FreeCAD.Rotation(*rotation)
-
-def get_qproc_command_start_live(usdlink, session_name):
-    # Returns the command needed to start live process
-    doc = FreeCAD.ActiveDocument
-    FreeCAD.setActiveDocument(doc.Name)
-    currentProjectURL = GetCurrentProjectLinkNoPrint()
-    error_code = None
-    success=None
-
-    # Batch file where the OV USD fetcher lives
-    batchfilepath = GetFetcherScriptsDirectory().replace(" ","` ")
-    batchfilename = GetBatchFileName(live=True)
-    batchfilepath = os.path.join(batchfilepath, batchfilename)
-
-    cmd = batchfilepath + ' --nucleus_url'+' '+ usdlink + ' --session_name ' + session_name + ' --start_live '
-    return cmd    
-
-async def run_live_assembly_listener(assembly_link, session_name):
-    asyncio.new_event_loop().create_task(live_start_session(FreeCAD.assembly_usd_link, session_name))
-
-def MoveAssemblyXformPositions(assemblyURL, component_usd_links, xform_translate, xform_rotation, token=None):
-    batchfilepath = GetFetcherScriptsDirectory().replace(" ","` ")
-    batchfilename = GetBatchFileName()
-    batchfilepath = os.path.join(batchfilepath, batchfilename)
-
-    component_usd_links = ' '.join(component_usd_links)
-    xform_rotation = parse_list_into_set_srt_command_arg(xform_rotation)
-    xform_translate = parse_list_into_set_srt_command_arg(xform_translate)
-
-    cmd = batchfilepath + ' --nucleus_url '+ str(assemblyURL) + ' --move_assembly ' + ' --set_rot_xyz ' + str(xform_rotation) + ' --set_transform ' +  str(xform_translate) + ' --asset_usd_links ' + str(component_usd_links)
-    if token is not None:
-        cmd = cmd + ' --token ' + str(token)
     print(cmd)
-    p = subprocess.Popen(['powershell', cmd], shell=True, stdout = subprocess.PIPE, stderr = subprocess.PIPE)
-    stdout, stderr = p.communicate()
-    stdout = stdout.decode('utf-8')
-    stderr = stderr.decode('utf-8')
-    # print(stdout[-1])
-    stdout = stdout.split('\n')
-    stderr = stderr.split('\n')
-    return stdout, stderr
+    process = subprocess.Popen(['powershell', cmd], shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    stdout, stderr = process.communicate()
+    return stdout.decode().splitlines(), stderr.decode().splitlines()
 
 class OmniConnectionSettingsPanel:
     # Omniverse connection settings panel
-    def __init__(self,widget):
-
+    def __init__(self, widget):
         self.form = widget
+        self.init_ui()
+
+    def init_ui(self):
         layout = QtGui.QVBoxLayout()
-        self.panel_name_text = QtGui.QLabel("Omniverse Connection Settings")
+        layout.addWidget(QtGui.QLabel("Omniverse Connection Settings"))
 
-        currentProjectURL = GetCurrentProjectLinkNoPrint()
-        currentSTPLink = GetCurrentSTPLinkNoPrint()
-        currentUSDLink = GetCurrentUSDLinkNoPrint()
-        
-        self.currentProjectURL_text = QtGui.QLabel(" \u274c No project Nucleus URL specified ")
-        self.selected_asset_text = QtGui.QLabel(" \u274c No STP asset selected.")
-        self.selected_asset_usd_text = QtGui.QLabel(' \u274c No corresponding USD asset selected.')
+        self.currentProjectURL_text = QtGui.QLabel(" ❌ No project Nucleus URL specified ")
+        self.selected_asset_text = QtGui.QLabel(" ❌ No STP asset selected.")
+        self.selected_asset_usd_text = QtGui.QLabel(' ❌ No corresponding USD asset selected.')
 
-        if currentSTPLink is not None:
-            self.selected_asset_text = QtGui.QLabel(" \u2705 Current STP asset: "+currentSTPLink.split('/')[-1])
+        stp, usd, proj = GetCurrentSTPLinkNoPrint(), GetCurrentUSDLinkNoPrint(), GetCurrentProjectLinkNoPrint()
+        if stp: self.selected_asset_text.setText(" ✅ Current STP asset: "+stp.split('/')[-1])
+        if usd: self.selected_asset_usd_text.setText(' ✅ Corresponding USD: '+ usd.split('/')[-1])
+        if proj: self.currentProjectURL_text.setText(" ✅ Current project URL: "+proj)
 
-        if currentProjectURL is not None:
-            self.currentProjectURL_text = QtGui.QLabel(" \u2705 Current project URL: "+currentProjectURL)
+        buttons = [
+            ("Open existing project", self.inputProjectURL),
+            ("Create new project", self.createNewProject),
+            ("Create new asset in project", self.dialogBoxCreateNewAsset),
+            ("Browse project assets", self.getListItem),
+            ("Disconnect from project", self.disconnect_from_project),
+            ("About", self.show_about_page)
+        ]
 
-        if currentUSDLink is not None:
-            self.selected_asset_usd_text = QtGui.QLabel(' \u2705 Corresponding USD: '+ currentUSDLink.split('/')[-1])
+        for label, func in buttons:
+            btn = QtGui.QPushButton(label)
+            btn.clicked.connect(func)
+            layout.addWidget(btn)
 
-        self.open_existing_project_button = QtGui.QPushButton("Open existing project")
-        self.open_existing_project_button.clicked.connect(self.inputProjectURL)
-        self.create_new_project_button = QtGui.QPushButton("Create new project")
-        self.create_new_project_button.clicked.connect(self.createNewProject)
-
-        self.settings_label = QtGui.QLabel('Omniverse Connector Settings')
-
-        self.create_asset_button = QtGui.QPushButton("Create new asset in project")
-        self.create_asset_button.clicked.connect(self.dialogBoxCreateNewAsset)
-
-        self.browse_button = QtGui.QPushButton("Browse project assets")
-        self.browse_button.clicked.connect(self.getListItem)
-
-        self.project_disconnect_button = QtGui.QPushButton("Disconnect from project")
-        self.project_disconnect_button.clicked.connect(self.disconnect_from_project)
-
-        self.about_button = QtGui.QPushButton("About")
-        self.about_button.clicked.connect(self.show_about_page)
-
-        layout.addWidget(self.panel_name_text)
-        layout.addWidget(self.open_existing_project_button)
-        layout.addWidget(self.create_new_project_button)        
-        layout.addWidget(self.create_asset_button)
-        layout.addWidget(self.browse_button)
         layout.addWidget(self.currentProjectURL_text)
         layout.addWidget(self.selected_asset_text)
         layout.addWidget(self.selected_asset_usd_text)
-        layout.addWidget(self.project_disconnect_button)
-        layout.addWidget(self.about_button)
-
-        # Deprecated refresh connection/check connection fuction
-        # self.check_button = QtGui.QPushButton("Validate link")
-        # self.check_button.clicked.connect(self.checkProjectURL)
-        # layout.addWidget(self.check_button)
-
         self.form.setLayout(layout)
 
     def show_about_page(self):
         dialog = QtGui.QInputDialog(self.form)
-        version_info = QtGui.QLabel("FreeCAD Omniverse Connector\nVersion 3.0.3 \n\u00A9 2024 The University of Manchester")
+        version_info = QtGui.QLabel("FreeCAD Omniverse Connector\nVersion 3.0.3 \n© 2024 The University of Manchester")
         dialog.show()
         dialog.findChild(QtGui.QLineEdit).hide()
         dialog.layout().itemAt(0).widget().hide()
-
         dialog.layout().insertWidget(1, version_info)
         button_box = dialog.findChild(QtGui.QDialogButtonBox)
-        button_box.clear() 
-        advanced_button = QtGui.QPushButton("Advanced")
-        button_box.addButton(advanced_button, QtGui.QDialogButtonBox.ActionRole)
-        advanced_button.clicked.connect(self.show_advanced_page)
-
+        button_box.clear()
+        adv_btn = QtGui.QPushButton("Advanced")
+        adv_btn.clicked.connect(self.show_advanced_page)
+        button_box.addButton(adv_btn, QtGui.QDialogButtonBox.ActionRole)
         dialog.exec_()
 
     def show_advanced_page(self):
@@ -1302,15 +1072,13 @@ class OmniConnectionSettingsPanel:
         advanced_label = QtGui.QLabel("Advanced Options")
         main_layout.addWidget(advanced_label)
 
-        # Use a grid layout for alignment
         grid_layout = QtGui.QGridLayout()
 
-        # USD link toggle and input
         usd_toggle = QtGui.QCheckBox("Enable direct USD push")
         usd_link_label = QtGui.QLabel("Nucleus USD link:")
         usd_link = QtGui.QLineEdit()
         usd_warning_label = QtGui.QLabel("")
-        usd_warning_label.setStyleSheet("color: red;")  # Warning text in red
+        usd_warning_label.setStyleSheet("color: red;")  
         usd_warning_label.hide()
 
         grid_layout.addWidget(usd_toggle, 0, 0, 1, 1)
@@ -1339,8 +1107,6 @@ class OmniConnectionSettingsPanel:
             usd_link.setText(FreeCAD.secondary_usdlink)
 
         usd_toggle.toggled.connect(lambda checked: usd_link.setEnabled(checked))
-
-        # STEP link toggle and input
         step_toggle = QtGui.QCheckBox("Enable direct STEP push")
         step_link_label = QtGui.QLabel("Nucleus STEP link:")
         step_link = QtGui.QLineEdit()
@@ -1401,32 +1167,23 @@ class OmniConnectionSettingsPanel:
 
 
     def disconnect_from_project(self):
-        if 'is_connected_to_nucleus_project' not in dir(FreeCAD):
-            FreeCAD.is_connected_to_nucleus_project = False
-            msgBox = QtGui.QMessageBox()
-            msgBox.setIcon(QtGui.QMessageBox.Warning)
-            msgBox.setText("No Nucleus project currently connected!")
-            msgBox.exec_()
-        if FreeCAD.is_connected_to_nucleus_project == False:
-            msgBox = QtGui.QMessageBox()
-            msgBox.setIcon(QtGui.QMessageBox.Warning)
-            msgBox.setText("No Nucleus project currently connected!")
-            msgBox.exec_()
-        else:
-            current_project_link = GetCurrentProjectLinkNoPrint()
-            last_project_link = GetLastProjectLinkNoPrint()
-            ClearLocalDirectory()
-            FreeCAD.assembly_usd_link=None
+        if not getattr(FreeCAD, 'is_connected_to_nucleus_project', False):
+            self._warn("No Nucleus project currently connected!")
+            return
 
-            if current_project_link != None:
-                SaveLastProjectLinkAsTextFile(current_project_link)
-            elif last_project_link!=None:
-                SaveLastProjectLinkAsTextFile(last_project_link)
-            self.currentProjectURL_text.setText('\u274c No project Nucleus URL specified.')
-            self.selected_asset_text.setText(' \u274c No STP asset selected.')
-            self.selected_asset_usd_text.setText(' \u274c No corresponding USD asset selected.')
-            FreeCAD.is_connected_to_nucleus_project = False
-
+        SaveLastProjectLinkAsTextFile(GetCurrentProjectLinkNoPrint() or GetLastProjectLinkNoPrint())
+        last_project_link = GetLastProjectLinkNoPrint()
+        current_project_link = GetCurrentProjectLinkNoPrint()
+        ClearLocalDirectory()
+        if current_project_link != None:
+            SaveLastProjectLinkAsTextFile(current_project_link)
+        elif last_project_link!=None:
+            SaveLastProjectLinkAsTextFile(last_project_link)
+        FreeCAD.assembly_usd_link = None
+        FreeCAD.is_connected_to_nucleus_project = False
+        self.currentProjectURL_text.setText('❌ No project Nucleus URL specified.')
+        self.selected_asset_text.setText(' ❌ No STP asset selected.')
+        self.selected_asset_usd_text.setText(' ❌ No corresponding USD asset selected.')
 
     def createNewProject(self):
         dialog = QtGui.QInputDialog(self.form)
@@ -1519,7 +1276,6 @@ class OmniConnectionSettingsPanel:
         self.input_box_project_url.setText(self.last_project_link)
 
     def inputProjectURL(self):
-
         dialog = QtGui.QInputDialog(self.form)
         dialog.setWindowTitle('Omniverse Connector for FreeCAD')
         dialog.setLabelText('Input existing project URL')
@@ -1644,12 +1400,8 @@ class OmniConnectionSettingsPanel:
             dialog.layout().insertWidget(2, input_assetname)
             dialog.layout().insertWidget(3, text_format_rules)
             current_project_dialogtext = QtGui.QLabel(' Current project:'+ currentProjectURL)
-
-
             dialog.exec_()
-            # print(host_name=='')
             asset_name = input_assetname.text()
-
             token = str(RandomTokenGenerator())
 
             if asset_name!='':
@@ -1695,8 +1447,6 @@ class OmniConnectionSettingsPanel:
         if currentProjectURL is not None:
             FindUSDandSTPFiles(currentProjectURL)
             item_list = GetListOfSTPFiles()
-            
-
             usd_list = GetListOfUSDFiles()
 
             if item_list!=None and usd_list!=None:
@@ -1725,7 +1475,6 @@ class OmniConnectionSettingsPanel:
                         SaveUSDLinkAsTextFile(usdlink)
                         GetAuthCheck(item,  filetype='stp')
                         GetAuthCheck(usdlink,  filetype='usd')
-
                         self.selected_asset_text.setText(' \u2705 Selected asset: '+item_short)
                         self.selected_asset_usd_text.setText(' \u2705 Corresponding USD: '+ usdlink_short)
                     elif item_short==new_asset_string:
@@ -1748,21 +1497,23 @@ class OmniConnectionSettingsPanel:
     def accept(self):
         FreeCADGui.Control.closeDialog() #close the dialog
 
+    def _warn(self, msg):
+        box = QtGui.QMessageBox()
+        box.setIcon(QtGui.QMessageBox.Warning)
+        box.setText(msg)
+        box.exec_()
+
 class _GetURLPanel:
-    """Command to create a panel where user specifies URL of nucleus file
+    """
+    Button to open the connection settings panel
     """
 
     def Activated(self):
-        # what is done when the command is clicked
-        # creates a panel with a dialog
         baseWidget = QtGui.QWidget()
         panel = OmniConnectionSettingsPanel(baseWidget)
-        # having a panel with a widget in self.form and the accept and 
-        # reject functions (if needed), we can open it:
         FreeCADGui.Control.showDialog(panel)
 
     def GetResources(self):
-        # icon and command information
         MenuText = QtCore.QT_TRANSLATE_NOOP(
             'Omniverse project settings',
             'Omniverse project settings')
@@ -1775,18 +1526,14 @@ class _GetURLPanel:
             'ToolTip': ToolTip}
 
     def IsActive(self):
-        # The command will be active if there is an active document
         return not FreeCAD.ActiveDocument is None
 
 class _GetAssemblyPanel:
-    """Command to create a panel for assembly
+    """
+    Button to open the assembly settings panel
     """
 
     def Activated(self):
-        # what is done when the command is clicked
-        # creates a panel with a dialog
-        # fc_main_window = FreeCADGui.getMainWindow()
-
         baseWidget = QtGui.QWidget()
         panel = OmniverseAssemblyPanel(baseWidget)
         FreeCADGui.Control.showDialog(panel)
@@ -1805,15 +1552,11 @@ class _GetAssemblyPanel:
             'ToolTip': ToolTip}
 
     def IsActive(self):
-        # The command will be active if there is an active document
         is_activeDocumentExists = not FreeCAD.ActiveDocument is None
-
         project_permission = GetCurrentProjectPermissions()
         projectURL = GetCurrentProjectLinkNoPrint()
-
         is_projectPermissionOK = project_permission == 'OK_ACCESS'
         is_projectURLExists = projectURL!= None
-
         is_checksValid = is_activeDocumentExists == True and is_projectPermissionOK==True and is_projectURLExists==True
 
         return is_checksValid
@@ -1821,5 +1564,5 @@ class _GetAssemblyPanel:
 FreeCADGui.addCommand('OVconnect_URLPanel', _GetURLPanel())
 FreeCADGui.addCommand('OVconnect_push_to_nucleus', _UploadCmd())
 FreeCADGui.addCommand('OVconnect_pull_from_nucleus', _DownloadCmd())
-# FreeCADGui.addCommand('OVconnect_clear_junk_files', _ClearJunkCmd())
 FreeCADGui.addCommand('OVconnect_assembly_tools', _GetAssemblyPanel())
+# FreeCADGui.addCommand('OVconnect_clear_junk_files', _ClearJunkCmd())

@@ -1301,7 +1301,6 @@ if __name__ == "__main__":
         list_of_stp_urls = []
         list_of_usd_urls = []
         for folder_items in project_folder_contents:
-            # TODO: ERROR HANDLING IF RESULT NOT OK!
             result, resolved_folder_info, resolved_absolute_url= omni.client.resolve(url=folder_items.relative_path, search_urls=[folder_url])
             if 'assembly' not in resolved_absolute_url:
                 result, asset_folder_contents = omni.client.list(url=resolved_absolute_url)

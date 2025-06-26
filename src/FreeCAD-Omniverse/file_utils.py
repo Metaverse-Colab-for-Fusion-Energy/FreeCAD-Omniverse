@@ -2,6 +2,7 @@ import os
 from utils import *
 import shutil
 import FreeCAD
+__dir__ = os.path.dirname(__file__)
 
 def GetFetcherScriptsDirectory():
     workbench_path = os.path.dirname(os.path.realpath(__file__))
@@ -37,84 +38,83 @@ def ClearLocalDirectory():
 def SaveUSDLinkAsTextFile(usdlink):
     local_directory = GetLocalDirectoryName()
     FreeCAD.OV_link_usd = clean_omniverse_path(str(usdlink))
-    textfile_name = local_directory+'/usdlink.txt'
+    textfile_name = os.path.join(local_directory, 'usdlink.txt')
     with open(textfile_name, 'w') as f:
         f.write(usdlink)
 
 def SaveSecondaryUSDLinkAsTextFile(usdlink):
     local_directory = GetLocalDirectoryName()
     FreeCAD.OV_link_usd = clean_omniverse_path(str(usdlink))
-    textfile_name = local_directory+'/secondary_usdlink.txt'
+    textfile_name = os.path.join(local_directory, 'secondary_usdlink.txt')
     with open(textfile_name, 'w') as f:
         f.write(usdlink)
 
 def SaveLastProjectLinkAsTextFile(usdlink):
     local_directory = GetLocalDirectoryName()
     FreeCAD.OV_link_project= clean_omniverse_path(str(usdlink))
-    textfile_name = local_directory+'/last_projectlink.txt'
+    textfile_name = os.path.join(local_directory, 'last_projectlink.txt')
     with open(textfile_name, 'w') as f:
         f.write(usdlink)
 
 def SaveProjectLinkAsTextFile(usdlink):
     local_directory = GetLocalDirectoryName()
     FreeCAD.OV_link_project= clean_omniverse_path(str(usdlink))
-    textfile_name = local_directory+'/projectlink.txt'
+    textfile_name = os.path.join(local_directory, 'projectlink.txt')
     with open(textfile_name, 'w') as f:
         f.write(usdlink)
 
 def SaveSTPLinkAsTextFile(stplink):
     local_directory = GetLocalDirectoryName()
     FreeCAD.OV_link_stp = clean_omniverse_path(str(stplink))
-    textfile_name = local_directory+'/stplink.txt'
+    textfile_name = os.path.join(local_directory, 'stplink.txt')
     with open(textfile_name, 'w') as f:
         f.write(stplink)
 
 def SaveSecondarySTPLinkAsTextFile(stplink):
     local_directory = GetLocalDirectoryName()
     FreeCAD.OV_link_stp = clean_omniverse_path(str(stplink))
-    textfile_name = local_directory+'/secondary_stplink.txt'
+    textfile_name = os.path.join(local_directory, 'secondary_stplink.txt')
     with open(textfile_name, 'w') as f:
         f.write(stplink)
 
 def SaveUSDPermissionsAsTextFile(permission):
     local_directory = GetLocalDirectoryName()
     FreeCAD.OV_permission_usd =permission
-    textfile_name = local_directory+'/usd_permission.txt'
+    textfile_name = os.path.join(local_directory, 'usd_permission.txt')
     with open(textfile_name, 'w') as f:
         f.write(permission)
 
 def SaveSecondaryUSDPermissionsAsTextFile(permission):
     local_directory = GetLocalDirectoryName()
     FreeCAD.OV_permission_usd =permission
-    textfile_name = local_directory+'/secondary_usd_permission.txt'
+    textfile_name = os.path.join(local_directory, 'secondary_usd_permission.txt')
     with open(textfile_name, 'w') as f:
         f.write(permission)
 
 def SaveProjectPermissionsAsTextFile(permission):
     local_directory = GetLocalDirectoryName()
     FreeCAD.OV_permission_project =permission
-    textfile_name = local_directory+'/project_permission.txt'
+    textfile_name = os.path.join(local_directory, 'project_permission.txt')
     with open(textfile_name, 'w') as f:
         f.write(permission)
 
 def SaveSTPPermissionsAsTextFile(permission):
     local_directory = GetLocalDirectoryName()
     FreeCAD.OV_permission_stp =permission
-    textfile_name = local_directory+'/stp_permission.txt'
+    textfile_name = os.path.join(local_directory, 'stp_permission.txt')
     with open(textfile_name, 'w') as f:
         f.write(permission)
 
 def SaveSecondarySTPPermissionsAsTextFile(permission):
     local_directory = GetLocalDirectoryName()
     FreeCAD.OV_permission_stp =permission
-    textfile_name = local_directory+'/secondary_stp_permission.txt'
+    textfile_name = os.path.join(local_directory, 'secondary_stp_permission.txt')
     with open(textfile_name, 'w') as f:
         f.write(permission)
 
-
 def delete_project_link():
     local_directory = GetLocalDirectoryName()
-    textfile_name = local_directory+'/projectlink.txt'
+    textfile_name = os.path.join(local_directory, 'projectlink.txt')
     try:
         os.remove(textfile_name)
     except FileNotFoundError:
@@ -129,15 +129,15 @@ def delete_project_link():
 def delete_asset_localdata():
     local_directory = GetLocalDirectoryName()
     textfile_names = [
-        str(local_directory)+'/usdlink.txt', 
-        str(local_directory)+'/usd_permission.txt', 
-        str(local_directory)+'/stplink.txt', 
-        str(local_directory)+'/stp_permission.txt', 
-        str(local_directory)+'/secondary_usd_permission.txt',
-        str(local_directory)+'/secondary_stp_permission.txt',
-        str(local_directory)+'/secondary_usdlink.txt',
-        str(local_directory)+'/secondary_stplink.txt',
-        ]
+        os.path.join(local_directory, 'usdlink.txt'),
+        os.path.join(local_directory, 'usd_permission.txt'),
+        os.path.join(local_directory, 'stplink.txt'),
+        os.path.join(local_directory, 'stp_permission.txt'),
+        os.path.join(local_directory, 'secondary_usd_permission.txt'),
+        os.path.join(local_directory, 'secondary_stp_permission.txt'),
+        os.path.join(local_directory, 'secondary_usdlink.txt'),
+        os.path.join(local_directory, 'secondary_stplink.txt'),
+    ]
     
     for asset_data in textfile_names:
         try:
@@ -155,7 +155,7 @@ def GetCurrentUSDPermissions(secondary=False):
     if secondary==False:
         try:
             local_directory = GetLocalDirectoryName()
-            textfile_name = local_directory+'/usd_permission.txt'
+            textfile_name = os.path.join(local_directory, 'usd_permission.txt')
             with open(textfile_name) as f:
                 lines = f.readlines()
             if len(lines) != 0:
@@ -168,7 +168,7 @@ def GetCurrentUSDPermissions(secondary=False):
     elif secondary == True:
         try:
             local_directory = GetLocalDirectoryName()
-            textfile_name = local_directory+'/secondary_usd_permission.txt'
+            textfile_name = os.path.join(local_directory, 'secondary_usd_permission.txt')
             with open(textfile_name) as f:
                 lines = f.readlines()
             if len(lines) != 0:
@@ -182,7 +182,7 @@ def GetCurrentUSDPermissions(secondary=False):
 def GetCurrentProjectPermissions():
     try:
         local_directory = GetLocalDirectoryName()
-        textfile_name = local_directory+'/project_permission.txt'
+        textfile_name = os.path.join(local_directory, 'project_permission.txt')
         with open(textfile_name) as f:
             lines = f.readlines()
         if len(lines) != 0:
@@ -197,7 +197,7 @@ def GetCurrentSTPPermissions(secondary=False):
     if secondary==False:
         try:
             local_directory = GetLocalDirectoryName()
-            textfile_name = local_directory+'/stp_permission.txt'
+            textfile_name = os.path.join(local_directory, 'stp_permission.txt')
             with open(textfile_name) as f:
                 lines = f.readlines()
             if len(lines) != 0:
@@ -210,7 +210,7 @@ def GetCurrentSTPPermissions(secondary=False):
     elif secondary == True:
         try:
             local_directory = GetLocalDirectoryName()
-            textfile_name = local_directory+'/secondary_stp_permission.txt'
+            textfile_name = os.path.join(local_directory, 'secondary_stp_permission.txt')
             with open(textfile_name) as f:
                 lines = f.readlines()
             if len(lines) != 0:
@@ -224,7 +224,7 @@ def GetCurrentSTPPermissions(secondary=False):
 def GetCurrentUSDLink():
     try:
         local_directory = GetLocalDirectoryName()
-        textfile_name = local_directory+'/usdlink.txt'
+        textfile_name = os.path.join(local_directory, 'usdlink.txt')
         with open(textfile_name) as f:
             lines = f.readlines()
         if len(lines) != 0:
@@ -240,7 +240,7 @@ def GetCurrentUSDLinkNoPrint(secondary=False):
     if secondary == False:
         try:
             local_directory = GetLocalDirectoryName()
-            textfile_name = local_directory+'/usdlink.txt'
+            textfile_name = os.path.join(local_directory, 'usdlink.txt')
             with open(textfile_name) as f:
                 lines = f.readlines()
             if len(lines) != 0:
@@ -253,7 +253,7 @@ def GetCurrentUSDLinkNoPrint(secondary=False):
     else:
         try:
             local_directory = GetLocalDirectoryName()
-            textfile_name = local_directory+'/secondary_usdlink.txt'
+            textfile_name = os.path.join(local_directory, 'secondary_usdlink.txt')
             with open(textfile_name) as f:
                 lines = f.readlines()
             if len(lines) != 0:
@@ -267,7 +267,7 @@ def GetCurrentUSDLinkNoPrint(secondary=False):
 def GetCurrentProjectLinkNoPrint():
     try:
         local_directory = GetLocalDirectoryName()
-        textfile_name = local_directory+'/projectlink.txt'
+        textfile_name = os.path.join(local_directory, 'projectlink.txt')
         with open(textfile_name) as f:
             lines = f.readlines()
         if len(lines) != 0:
@@ -281,7 +281,7 @@ def GetCurrentProjectLinkNoPrint():
 def GetLastProjectLinkNoPrint():
     try:
         local_directory = GetLocalDirectoryName()
-        textfile_name = local_directory+'/last_projectlink.txt'
+        textfile_name = os.path.join(local_directory, 'last_projectlink.txt')
         with open(textfile_name) as f:
             lines = f.readlines()
         if len(lines) != 0:
@@ -296,7 +296,7 @@ def GetCurrentSTPLinkNoPrint(secondary=False):
     if secondary == False:
         try:
             local_directory = GetLocalDirectoryName()
-            textfile_name = local_directory+'/stplink.txt'
+            textfile_name = os.path.join(local_directory, 'stplink.txt')
             with open(textfile_name) as f:
                 lines = f.readlines()
             if len(lines) != 0:
@@ -309,7 +309,7 @@ def GetCurrentSTPLinkNoPrint(secondary=False):
     else:
         try:
             local_directory = GetLocalDirectoryName()
-            textfile_name = local_directory+'/secondary_stplink.txt'
+            textfile_name = os.path.join(local_directory, 'secondary_stplink.txt')
             with open(textfile_name) as f:
                 lines = f.readlines()
             if len(lines) != 0:
@@ -338,7 +338,7 @@ def check_file_isempty(file_path):
 def GetListOfSTPFiles():
     try:
         local_directory = GetLocalDirectoryName()
-        textfile_name = local_directory+'/stplist.txt'
+        textfile_name = os.path.join(local_directory, 'stplist.txt')
         stp_url_list = []
         with open(textfile_name) as f:
             lines = f.readlines()
@@ -355,7 +355,7 @@ def GetListOfSTPFiles():
 def GetListOfUSDFiles():
     try:
         local_directory = GetLocalDirectoryName()
-        textfile_name = local_directory+'/usdlist.txt'
+        textfile_name = os.path.join(local_directory, 'usdlist.txt')
         usd_url_list = []
         with open(textfile_name) as f:
             lines = f.readlines()
