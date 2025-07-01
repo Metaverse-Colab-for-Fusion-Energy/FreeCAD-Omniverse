@@ -2,7 +2,48 @@ import os
 from utils import *
 import shutil
 import FreeCAD
+import subprocess
 __dir__ = os.path.dirname(__file__)
+
+
+def GetAuthCheck(usdlink, filetype='usd', secondary=False):
+    error_codes = {'NO_PERMISSION', 'NOT_FOUND', 'NO_AUTH'}
+    print(f'Validating connection with {usdlink}')
+
+    batchfilepath = os.path.join(
+        GetFetcherScriptsDirectory().replace(" ", "` "),
+        GetBatchFileName()
+    )
+    auth_flag = '--auth_project' if filetype == 'project' else '--auth'
+    cmd = f'{batchfilepath} --nucleus_url {usdlink} {auth_flag}'
+
+    process = subprocess.Popen(
+        ['powershell', cmd],
+        shell=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE
+    )
+    stdout, stderr = process.communicate()
+    stdout_lines = stdout.decode('utf-8').split('\r\n')
+    stderr_output = stderr.decode('utf-8')
+
+    no_access = sum(1 for line in stdout_lines if any(code in line for code in error_codes))
+    permission = 'OK_ACCESS' if no_access == 0 else 'NO_ACCESS'
+
+    save_functions = {
+        ('usd', False): SaveUSDPermissionsAsTextFile,
+        ('stp', False): SaveSTPPermissionsAsTextFile,
+        ('project', False): SaveProjectPermissionsAsTextFile,
+        ('usd', True): SaveSecondaryUSDPermissionsAsTextFile,
+        ('stp', True): SaveSecondarySTPPermissionsAsTextFile
+    }
+
+    save_func = save_functions.get((filetype, secondary))
+    if save_func:
+        save_func(permission)
+
+    print('[ERRORS]', stderr_output)
+    return stdout_lines, stderr_output, permission
 
 def GetFetcherScriptsDirectory():
     workbench_path = os.path.dirname(os.path.realpath(__file__))

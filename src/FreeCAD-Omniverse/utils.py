@@ -1,24 +1,11 @@
 import re
 import os
-import FreeCADGui
 import FreeCAD
 import string
 import random
 __dir__ = os.path.dirname(__file__)
 
-def GetCurrentSelection():
-    # helper func to get user's freecad selection
-    selection = FreeCADGui.Selection.getSelection()
-    if str(selection) =='[<App::Origin object>]':
-        print('[ERROR] Origin object selected. Select a valid mesh, part, or body object to push to Nucleus.')
-        return None
-    if len(selection) == 1:
-        selected_object = selection[0]
-        print("Selected object:", selected_object.Name)
-        return selected_object
-    else:
-        print("[ERROR] No object selected or multiple objects selected! Select a single object from the Model tree to push to Nucleus.")
-        return None
+
 
 def RandomTokenGenerator():
     # func for generating token

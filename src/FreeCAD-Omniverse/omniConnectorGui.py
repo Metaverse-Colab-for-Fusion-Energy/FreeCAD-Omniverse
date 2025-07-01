@@ -24,7 +24,7 @@
 #*                                                                         *
 #***************************************************************************/
 
-from PySide import QtCore, QtGui
+from PySide2 import QtCore, QtGui, QtWidgets
 import FreeCAD
 import FreeCADGui
 import Part
@@ -43,63 +43,19 @@ from utils import *
 from file_utils import *
 __dir__ = os.path.dirname(__file__)
 
-def GetAuthCheck(usdlink, filetype='usd', secondary=False):
-    """
-    Checks authentication and access permissions for a given Nucleus URL.
-    
-    Args:
-        usdlink (str): The Nucleus URL to check permissions for.
-        filetype (str): Type of file ('usd', 'stp', or 'project').
-        secondary (bool): Whether this is a secondary permission check.
-    
-    Returns:
-        tuple: (stdout_lines, stderr_output, permission_status)
-    """
-    error_codes = {'NO_PERMISSION', 'NOT_FOUND', 'NO_AUTH'}
-    print(f'Validating connection with {usdlink}')
-
-    batchfilepath = os.path.join(
-        GetFetcherScriptsDirectory().replace(" ", "` "), 
-        GetBatchFileName()
-    )
-
-    auth_flag = '--auth_project' if filetype == 'project' else '--auth'
-    cmd = f'{batchfilepath} --nucleus_url {usdlink} {auth_flag}'
-
-    process = subprocess.Popen(
-        ['powershell', cmd],
-        shell=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE
-    )
-    stdout, stderr = process.communicate()
-    stdout_lines = stdout.decode('utf-8').split('\r\n')
-    stderr_output = stderr.decode('utf-8')
-
-    # Print and check for error codes
-    no_access = 0
-    for line in stdout_lines:
-        print('[OmniClient]', line)
-        if any(code in line for code in error_codes):
-            no_access += 1
-
-    permission = 'OK_ACCESS' if no_access == 0 else 'NO_ACCESS'
-
-    # Permission saving dispatch
-    save_functions = {
-        ('usd', False): SaveUSDPermissionsAsTextFile,
-        ('stp', False): SaveSTPPermissionsAsTextFile,
-        ('project', False): SaveProjectPermissionsAsTextFile,
-        ('usd', True): SaveSecondaryUSDPermissionsAsTextFile,
-        ('stp', True): SaveSecondarySTPPermissionsAsTextFile
-    }
-
-    save_func = save_functions.get((filetype, secondary))
-    if save_func:
-        save_func(permission)
-
-    print('[ERRORS]', stderr_output)
-    return stdout_lines, stderr_output, permission
+def GetCurrentSelection():
+    # helper func to get user's freecad selection
+    selection = FreeCADGui.Selection.getSelection()
+    if str(selection) =='[<App::Origin object>]':
+        print('[ERROR] Origin object selected. Select a valid mesh, part, or body object to push to Nucleus.')
+        return None
+    if len(selection) == 1:
+        selected_object = selection[0]
+        print("Selected object:", selected_object.Name)
+        return selected_object
+    else:
+        print("[ERROR] No object selected or multiple objects selected! Select a single object from the Model tree to push to Nucleus.")
+        return None
 
 
 def FindUSDandSTPFiles(usdlink):
@@ -592,7 +548,7 @@ class _DownloadCmd:
             for key, val in props.items():
                 obj = attachNewStringProperty(obj, property_name=key, property_value=val)
         else:
-            QtGui.QMessageBox.critical(
+            QtWidgets.QMessageBox.critical(
                 None,
                 'Omniverse Connector for FreeCAD',
                 fc_err
@@ -663,7 +619,7 @@ class _UploadCmd:
             if local == stored:
                 return local
             options = [stored, local]
-            choice, ok = QtGui.QInputDialog.getItem(None, "Omniverse Connector for FreeCAD",
+            choice, ok = QtWidgets.QInputDialog.getItem(None, "Omniverse Connector for FreeCAD",
                                                     f'Found conflict in Nucleus {label} links. Select one to push to:',
                                                     options, 0, False)
             return choice if ok else None
@@ -673,7 +629,7 @@ class _UploadCmd:
             usdlink = resolve_link_conflict("USD", usd_local, usd_fc)
             stplink = resolve_link_conflict("STP", stp_local, stp_fc)
             if not usdlink or not stplink:
-                QtGui.QMessageBox.critical(None, "Omniverse Connector for FreeCAD", "Failed to push to Nucleus!")
+                QtWidgets.QMessageBox.critical(None, "Omniverse Connector for FreeCAD", "Failed to push to Nucleus!")
                 return
         else:
             usdlink, stplink = usd_local, stp_local
@@ -751,7 +707,7 @@ class _CheckConnectionCmd:
         # The command will be active if there is an active document
         return not FreeCAD.ActiveDocument is None
 
-class AssemblyChecklistDialog(QtGui.QDialog):
+class AssemblyChecklistDialog(QtWidgets.QDialog):
     """Checklist Dialog for creating new assembly - user can select assembly components and set assembly name"""
     def __init__(
         self,
@@ -765,7 +721,7 @@ class AssemblyChecklistDialog(QtGui.QDialog):
         self.name = name
         self.icon = icon
         self.model = QtGui.QStandardItemModel()
-        self.listView = QtGui.QListView()
+        self.listView = QtWidgets.QListView()
         for string in stringlist:
             item = QtGui.QStandardItem(string)
             item.setCheckable(True)
@@ -776,23 +732,23 @@ class AssemblyChecklistDialog(QtGui.QDialog):
 
         self.listView.setModel(self.model)
 
-        self.okButton = QtGui.QPushButton('Create new assembly')
-        self.cancelButton = QtGui.QPushButton('Cancel')
-        self.selectButton = QtGui.QPushButton('Select All')
-        self.unselectButton = QtGui.QPushButton('Unselect All')
+        self.okButton = QtWidgets.QPushButton('Create new assembly')
+        self.cancelButton = QtWidgets.QPushButton('Cancel')
+        self.selectButton = QtWidgets.QPushButton('Select All')
+        self.unselectButton = QtWidgets.QPushButton('Unselect All')
 
-        self.assembly_name_text = QtGui.QLabel('New assembly name:')
-        self.assembly_name_input = QtGui.QLineEdit()
-        self.assembly_items_text = QtGui.QLabel('Select assembly items:')
+        self.assembly_name_text = QtWidgets.QLabel('New assembly name:')
+        self.assembly_name_input = QtWidgets.QLineEdit()
+        self.assembly_items_text = QtWidgets.QLabel('Select assembly items:')
 
-        hbox = QtGui.QHBoxLayout()
+        hbox = QtWidgets.QHBoxLayout()
         hbox.addStretch(1)
         hbox.addWidget(self.okButton)
         hbox.addWidget(self.cancelButton)
         hbox.addWidget(self.selectButton)
         hbox.addWidget(self.unselectButton)
 
-        vbox = QtGui.QVBoxLayout(self)
+        vbox = QtWidgets.QVBoxLayout(self)
         vbox.addWidget(self.assembly_name_text)
         vbox.addWidget(self.assembly_name_input)
         vbox.addWidget(self.assembly_items_text)
@@ -868,7 +824,7 @@ class OmniverseAssemblyPanel:
     """
     def __init__(self, widget):
         self.form = widget
-        self.layout = QtGui.QVBoxLayout(widget)
+        self.layout = QtWidgets.QVBoxLayout(widget)
         self.currentProjectURL = GetCurrentProjectLinkNoPrint()
         self.assemblyUSDLink = getattr(FreeCAD, 'assembly_usd_link', None)
         self.proc = None
@@ -876,10 +832,10 @@ class OmniverseAssemblyPanel:
         self._build_ui()
 
     def _build_ui(self):
-        self.status_label = QtGui.QLabel(' Status: \u2705 Ready' if self.assemblyUSDLink else ' Status: \u274c')
+        self.status_label = QtWidgets.QLabel(' Status: \u2705 Ready' if self.assemblyUSDLink else ' Status: \u274c')
         current_assembly = self.assemblyUSDLink.split('/')[-1] if self.assemblyUSDLink else 'No assembly selected'
-        self.assy_label = QtGui.QLabel(f' \u2705 Current assembly: {current_assembly}' if self.assemblyUSDLink else f' \u274c {current_assembly}')
-        project_label = QtGui.QLabel(f' \u2705 Current project: {self.currentProjectURL}')
+        self.assy_label = QtWidgets.QLabel(f' \u2705 Current assembly: {current_assembly}' if self.assemblyUSDLink else f' \u274c {current_assembly}')
+        project_label = QtWidgets.QLabel(f' \u2705 Current project: {self.currentProjectURL}')
         buttons = [
             ("Make assembly from workspace objects", self.flow_create_new_assembly),
             ("Import existing assembly into workspace", self.flow_open_existing_assembly),
@@ -887,16 +843,16 @@ class OmniverseAssemblyPanel:
             ("Fetch new assembly changes", self.flow_download_assembly_changes),
         ]
         for text, func in buttons:
-            btn = QtGui.QPushButton(text); btn.clicked.connect(func); self.layout.addWidget(btn)
-        self.live_mode_button = QtGui.QPushButton("(EXPERIMENTAL) Live assembly mode")
+            btn = QtWidgets.QPushButton(text); btn.clicked.connect(func); self.layout.addWidget(btn)
+        self.live_mode_button = QtWidgets.QPushButton("(EXPERIMENTAL) Live assembly mode")
         self.live_mode_button.setCheckable(True)
         self.live_mode_button.clicked.connect(self.flow_start_live_assy_mode)
-        for w in [QtGui.QLabel("Assembly Panel"), self.status_label, project_label, self.assy_label, self.live_mode_button]:
+        for w in [QtWidgets.QLabel("Assembly Panel"), self.status_label, project_label, self.assy_label, self.live_mode_button]:
             self.layout.addWidget(w)
 
     def _warn(self, msg):
         print('[WARN]', msg)
-        box = QtGui.QMessageBox(); box.setIcon(QtGui.QMessageBox.Warning)
+        box = QtWidgets.QMessageBox(); box.setIcon(QtWidgets.QMessageBox.Warning)
         box.setText(msg); box.exec_()
 
     def flow_create_new_assembly(self):
@@ -922,7 +878,7 @@ class OmniverseAssemblyPanel:
         out, err, links = FindExistingAssembliesOnNucleus(self.currentProjectURL)
         if not links: return self._warn("No existing assemblies found.")
         names = [l.split('/')[-1] for l in links]
-        name, ok = QtGui.QInputDialog.getItem(self.form, "Select assembly", "Import:", names, 0, False)
+        name, ok = QtWidgets.QInputDialog.getItem(self.form, "Select assembly", "Import:", names, 0, False)
         if not ok: return
         link = next(l for l in links if name in l)
         FreeCAD.assembly_usd_link = link
@@ -964,7 +920,7 @@ class OmniverseAssemblyPanel:
         if not link: return self._warn("No assembly link specified.")
         success, sessions, _ = GetAvailableLiveSessions(link)
         if not success: return self._warn("No live sessions found.")
-        session, ok = QtGui.QInputDialog.getItem(self.form, "Select session", "Available:", sessions, 0, False)
+        session, ok = QtWidgets.QInputDialog.getItem(self.form, "Select session", "Available:", sessions, 0, False)
         if not ok: return
         self.live_mode_button.setText("(EXPERIMENTAL) Live assembly mode ACTIVE")
         self.proc = QtCore.QProcess()
@@ -1017,12 +973,12 @@ class OmniConnectionSettingsPanel:
         self.init_ui()
 
     def init_ui(self):
-        layout = QtGui.QVBoxLayout()
-        layout.addWidget(QtGui.QLabel("Omniverse Connection Settings"))
+        layout = QtWidgets.QVBoxLayout()
+        layout.addWidget(QtWidgets.QLabel("Omniverse Connection Settings"))
 
-        self.currentProjectURL_text = QtGui.QLabel(" ❌ No project Nucleus URL specified ")
-        self.selected_asset_text = QtGui.QLabel(" ❌ No STP asset selected.")
-        self.selected_asset_usd_text = QtGui.QLabel(' ❌ No corresponding USD asset selected.')
+        self.currentProjectURL_text = QtWidgets.QLabel(" ❌ No project Nucleus URL specified ")
+        self.selected_asset_text = QtWidgets.QLabel(" ❌ No STP asset selected.")
+        self.selected_asset_usd_text = QtWidgets.QLabel(' ❌ No corresponding USD asset selected.')
 
         stp, usd, proj = GetCurrentSTPLinkNoPrint(), GetCurrentUSDLinkNoPrint(), GetCurrentProjectLinkNoPrint()
         if stp: self.selected_asset_text.setText(" ✅ Current STP asset: "+stp.split('/')[-1])
@@ -1039,7 +995,7 @@ class OmniConnectionSettingsPanel:
         ]
 
         for label, func in buttons:
-            btn = QtGui.QPushButton(label)
+            btn = QtWidgets.QPushButton(label)
             btn.clicked.connect(func)
             layout.addWidget(btn)
 
@@ -1049,35 +1005,35 @@ class OmniConnectionSettingsPanel:
         self.form.setLayout(layout)
 
     def show_about_page(self):
-        dialog = QtGui.QInputDialog(self.form)
-        version_info = QtGui.QLabel("FreeCAD Omniverse Connector\nVersion 3.0.3 \n© 2024 The University of Manchester")
+        dialog = QtWidgets.QInputDialog(self.form)
+        version_info = QtWidgets.QLabel("FreeCAD Omniverse Connector\nVersion 3.0.3 \n© 2024 The University of Manchester")
         dialog.show()
-        dialog.findChild(QtGui.QLineEdit).hide()
+        dialog.findChild(QtWidgets.QLineEdit).hide()
         dialog.layout().itemAt(0).widget().hide()
         dialog.layout().insertWidget(1, version_info)
-        button_box = dialog.findChild(QtGui.QDialogButtonBox)
+        button_box = dialog.findChild(QtWidgets.QDialogButtonBox)
         button_box.clear()
-        adv_btn = QtGui.QPushButton("Advanced")
+        adv_btn = QtWidgets.QPushButton("Advanced")
         adv_btn.clicked.connect(self.show_advanced_page)
-        button_box.addButton(adv_btn, QtGui.QDialogButtonBox.ActionRole)
+        button_box.addButton(adv_btn, QtWidgets.QDialogButtonBox.ActionRole)
         dialog.exec_()
 
     def show_advanced_page(self):
         # Create a dialog for Advanced options
-        advanced_dialog = QtGui.QDialog()
+        advanced_dialog = QtWidgets.QDialog()
         advanced_dialog.setWindowTitle("Advanced Options")
-        main_layout = QtGui.QVBoxLayout(advanced_dialog)
+        main_layout = QtWidgets.QVBoxLayout(advanced_dialog)
 
         # Main label
-        advanced_label = QtGui.QLabel("Advanced Options")
+        advanced_label = QtWidgets.QLabel("Advanced Options")
         main_layout.addWidget(advanced_label)
 
         grid_layout = QtGui.QGridLayout()
 
-        usd_toggle = QtGui.QCheckBox("Enable direct USD push")
-        usd_link_label = QtGui.QLabel("Nucleus USD link:")
-        usd_link = QtGui.QLineEdit()
-        usd_warning_label = QtGui.QLabel("")
+        usd_toggle = QtWidgets.QCheckBox("Enable direct USD push")
+        usd_link_label = QtWidgets.QLabel("Nucleus USD link:")
+        usd_link = QtWidgets.QLineEdit()
+        usd_warning_label = QtWidgets.QLabel("")
         usd_warning_label.setStyleSheet("color: red;")  
         usd_warning_label.hide()
 
@@ -1107,10 +1063,10 @@ class OmniConnectionSettingsPanel:
             usd_link.setText(FreeCAD.secondary_usdlink)
 
         usd_toggle.toggled.connect(lambda checked: usd_link.setEnabled(checked))
-        step_toggle = QtGui.QCheckBox("Enable direct STEP push")
-        step_link_label = QtGui.QLabel("Nucleus STEP link:")
-        step_link = QtGui.QLineEdit()
-        step_warning_label = QtGui.QLabel("")
+        step_toggle = QtWidgets.QCheckBox("Enable direct STEP push")
+        step_link_label = QtWidgets.QLabel("Nucleus STEP link:")
+        step_link = QtWidgets.QLineEdit()
+        step_warning_label = QtWidgets.QLabel("")
         step_warning_label.setStyleSheet("color: red;")  # Warning text in red
         step_warning_label.hide()
 
@@ -1130,12 +1086,12 @@ class OmniConnectionSettingsPanel:
             step_link.setText(FreeCAD.secondary_stplink)
         main_layout.addLayout(grid_layout)
 
-        button_box = QtGui.QDialogButtonBox(QtGui.QDialogButtonBox.Ok | QtGui.QDialogButtonBox.Cancel)
+        button_box = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.Ok | QtWidgets.QDialogButtonBox.Cancel)
         button_box.accepted.connect(advanced_dialog.accept)
         button_box.rejected.connect(advanced_dialog.reject)
         main_layout.addWidget(button_box)
 
-        if advanced_dialog.exec_() == QtGui.QDialog.Accepted:
+        if advanced_dialog.exec_() == QtWidgets.QDialog.Accepted:
             if usd_toggle.isChecked():
                 secondary_usdlink = usd_link.text()
                 _, _, permission = GetAuthCheck(secondary_usdlink, filetype='usd', secondary=True)
@@ -1186,20 +1142,20 @@ class OmniConnectionSettingsPanel:
         self.selected_asset_usd_text.setText(' ❌ No corresponding USD asset selected.')
 
     def createNewProject(self):
-        dialog = QtGui.QInputDialog(self.form)
+        dialog = QtWidgets.QInputDialog(self.form)
         dialog.setWindowTitle('Omniverse Connector for FreeCAD')
         dialog.setLabelText('Create new project on Nucleus')
         dialog.show()
 
-        dialog.findChild(QtGui.QLineEdit).hide()
+        dialog.findChild(QtWidgets.QLineEdit).hide()
 
-        text_format_rules = QtGui.QLabel("Project names must start with a letter. \nIt can contain letters, digits, or underscores, and cannot contain spaces.")
+        text_format_rules = QtWidgets.QLabel("Project names must start with a letter. \nIt can contain letters, digits, or underscores, and cannot contain spaces.")
 
-        hostname_prompt = QtGui.QLabel("Nucleus host name:")
-        input_hostname = QtGui.QLineEdit()
-        projectname_prompt = QtGui.QLabel("New project name:")
-        input_projectname = QtGui.QLineEdit()
-        make_project_private_bool = QtGui.QCheckBox("Make project private")
+        hostname_prompt = QtWidgets.QLabel("Nucleus host name:")
+        input_hostname = QtWidgets.QLineEdit()
+        projectname_prompt = QtWidgets.QLabel("New project name:")
+        input_projectname = QtWidgets.QLineEdit()
+        make_project_private_bool = QtWidgets.QCheckBox("Make project private")
 
         dialog.layout().insertWidget(1, hostname_prompt)
         dialog.layout().insertWidget(2, input_hostname)
@@ -1235,8 +1191,8 @@ class OmniConnectionSettingsPanel:
                             if error_warning_text == None:
                                 error_warning_text = 'Failed to create new project!'
 
-                            msgBox = QtGui.QMessageBox()
-                            msgBox.setIcon(QtGui.QMessageBox.Critical)
+                            msgBox = QtWidgets.QMessageBox()
+                            msgBox.setIcon(QtWidgets.QMessageBox.Critical)
                             msgBox.setText(error_warning_text)
                             msgBox.exec_()
                         elif ok==True:
@@ -1249,26 +1205,26 @@ class OmniConnectionSettingsPanel:
                                 self.selected_asset_text.setText(' \u274c No STP asset selected.')
                                 self.selected_asset_usd_text.setText(' \u274c No corresponding USD asset selected.')
                     else:
-                        msgBox = QtGui.QMessageBox()
-                        msgBox.setIcon(QtGui.QMessageBox.Warning)
+                        msgBox = QtWidgets.QMessageBox()
+                        msgBox.setIcon(QtWidgets.QMessageBox.Warning)
                         msgBox.setText("Project names cannot contain the text 'asset' or 'assembly'.")
                         msgBox.exec_()
                         self.createNewProject()
                 else:
-                    msgBox = QtGui.QMessageBox()
-                    msgBox.setIcon(QtGui.QMessageBox.Warning)
+                    msgBox = QtWidgets.QMessageBox()
+                    msgBox.setIcon(QtWidgets.QMessageBox.Warning)
                     msgBox.setText("Project names must start with a letter.\nIt can contain letters, digits, or underscores, and cannot contain spaces.")
                     msgBox.exec_()
                     self.createNewProject()
             else:
-                msgBox = QtGui.QMessageBox()
-                msgBox.setIcon(QtGui.QMessageBox.Warning)
+                msgBox = QtWidgets.QMessageBox()
+                msgBox.setIcon(QtWidgets.QMessageBox.Warning)
                 msgBox.setText("No project name specified!")
                 msgBox.exec_()
                 self.createNewProject()
         else:
-            msgBox = QtGui.QMessageBox()
-            msgBox.setIcon(QtGui.QMessageBox.Warning)
+            msgBox = QtWidgets.QMessageBox()
+            msgBox.setIcon(QtWidgets.QMessageBox.Warning)
             msgBox.setText("No hostname specified!")
             msgBox.exec_()
 
@@ -1276,14 +1232,14 @@ class OmniConnectionSettingsPanel:
         self.input_box_project_url.setText(self.last_project_link)
 
     def inputProjectURL(self):
-        dialog = QtGui.QInputDialog(self.form)
+        dialog = QtWidgets.QInputDialog(self.form)
         dialog.setWindowTitle('Omniverse Connector for FreeCAD')
         dialog.setLabelText('Input existing project URL')
         dialog.show()
-        dialog.findChild(QtGui.QLineEdit).hide()
+        dialog.findChild(QtWidgets.QLineEdit).hide()
         
-        self.input_box_project_url = QtGui.QLineEdit()
-        projecturl_prompt_text = QtGui.QLabel("Enter a link with format omniverse://HOST_NAME/PROJECT_PATH")
+        self.input_box_project_url = QtWidgets.QLineEdit()
+        projecturl_prompt_text = QtWidgets.QLabel("Enter a link with format omniverse://HOST_NAME/PROJECT_PATH")
 
         dialog.layout().insertWidget(1, self.input_box_project_url)
         dialog.layout().insertWidget(2, projecturl_prompt_text)
@@ -1292,7 +1248,7 @@ class OmniConnectionSettingsPanel:
 
 
         if self.last_project_link != None:
-            last_project_completer = QtGui.QCompleter([self.last_project_link])
+            last_project_completer = QtWidgets.QCompleter([self.last_project_link])
             self.input_box_project_url.setCompleter(last_project_completer)
 
 
@@ -1308,14 +1264,14 @@ class OmniConnectionSettingsPanel:
                         self.selected_asset_text.setText(' \u274c No STP asset selected.')
                         self.selected_asset_usd_text.setText(' \u274c No corresponding USD asset selected.')
                 else:
-                    msgBox = QtGui.QMessageBox()
-                    msgBox.setIcon(QtGui.QMessageBox.Warning)
+                    msgBox = QtWidgets.QMessageBox()
+                    msgBox.setIcon(QtWidgets.QMessageBox.Warning)
                     msgBox.setText("Project links cannot contain the text 'asset' or 'assembly'.\nEnter a link with format omniverse://HOST_NAME/PROJECT_DIRECTORY . ")
                     msgBox.exec_()
                     self.inputProjectURL()       
             else:
-                msgBox = QtGui.QMessageBox()
-                msgBox.setIcon(QtGui.QMessageBox.Warning)
+                msgBox = QtWidgets.QMessageBox()
+                msgBox.setIcon(QtWidgets.QMessageBox.Warning)
                 msgBox.setText("Project links are folder links and must not include .usd in its path.\nEnter a link with format omniverse://HOST_NAME/PROJECT_DIRECTORY . ")
                 msgBox.exec_()
                 self.inputProjectURL()
@@ -1331,8 +1287,8 @@ class OmniConnectionSettingsPanel:
                 print(permission)
                 if permission == 'NO_ACCESS':
                     print('[ERROR] Failed to authenticate with Nucleus at '+ savedURL)
-                    msgBox = QtGui.QMessageBox()
-                    msgBox.setIcon(QtGui.QMessageBox.Critical)
+                    msgBox = QtWidgets.QMessageBox()
+                    msgBox.setIcon(QtWidgets.QMessageBox.Critical)
                     msgBox.setText("[ERROR] Failed to authenticate with nucleus at "+savedURL)
                     msgBox.exec_()
                     self.currentProjectURL_text.setText('\u274c No project Nucleus URL specified.')
@@ -1346,8 +1302,8 @@ class OmniConnectionSettingsPanel:
 
         elif currentProjectURL is not None and inputProjectURL==None:
             SaveProjectLinkAsTextFile(currentProjectURL)
-            msgBox = QtGui.QMessageBox()
-            msgBox.setIcon(QtGui.QMessageBox.Warning)
+            msgBox = QtWidgets.QMessageBox()
+            msgBox.setIcon(QtWidgets.QMessageBox.Warning)
             msgBox.setText("No USD link specified! \nRevert to initial Nucleus USD link at:\n"+currentProjectURL)
             msgBox.exec_()
 
@@ -1359,8 +1315,8 @@ class OmniConnectionSettingsPanel:
                 print(permission)
                 if permission == 'NO_ACCESS':
                     print('[ERROR] Failed to authenticate with Nucleus at '+ savedURL)
-                    msgBox = QtGui.QMessageBox()
-                    msgBox.setIcon(QtGui.QMessageBox.Critical)
+                    msgBox = QtWidgets.QMessageBox()
+                    msgBox.setIcon(QtWidgets.QMessageBox.Critical)
                     msgBox.setText("[ERROR] Failed to authenticate with nucleus at "+savedURL)
                     msgBox.exec_()
                     self.currentProjectURL_text.setText(' \u274c No Project Nucleus URL specified.')
@@ -1373,8 +1329,8 @@ class OmniConnectionSettingsPanel:
                     FreeCAD.is_connected_to_nucleus_project = True
         else:
             print('[WARN] No project link specified!')
-            msgBox = QtGui.QMessageBox()
-            msgBox.setIcon(QtGui.QMessageBox.Critical)
+            msgBox = QtWidgets.QMessageBox()
+            msgBox.setIcon(QtWidgets.QMessageBox.Critical)
             msgBox.setText("No project link specified!")
             msgBox.exec_()
             ok = False
@@ -1383,23 +1339,23 @@ class OmniConnectionSettingsPanel:
     def dialogBoxCreateNewAsset(self):
         currentProjectURL = GetCurrentProjectLinkNoPrint()
         if currentProjectURL:
-            dialog = QtGui.QInputDialog(self.form)
+            dialog = QtWidgets.QInputDialog(self.form)
             dialog.setWindowTitle('Omniverse Connector for FreeCAD')
             dialog.setLabelText('Create new asset on Nucleus')
             
             dialog.show()
 
-            dialog.findChild(QtGui.QLineEdit).hide()
+            dialog.findChild(QtWidgets.QLineEdit).hide()
 
-            assetname_prompt = QtGui.QLabel("New asset name:")
-            input_assetname = QtGui.QLineEdit()
+            assetname_prompt = QtWidgets.QLabel("New asset name:")
+            input_assetname = QtWidgets.QLineEdit()
 
-            text_format_rules = QtGui.QLabel("Asset names must start with a letter. \nIt can contain letters, digits, or underscores, and cannot contain spaces.")
+            text_format_rules = QtWidgets.QLabel("Asset names must start with a letter. \nIt can contain letters, digits, or underscores, and cannot contain spaces.")
 
             dialog.layout().insertWidget(1, assetname_prompt)
             dialog.layout().insertWidget(2, input_assetname)
             dialog.layout().insertWidget(3, text_format_rules)
-            current_project_dialogtext = QtGui.QLabel(' Current project:'+ currentProjectURL)
+            current_project_dialogtext = QtWidgets.QLabel(' Current project:'+ currentProjectURL)
             dialog.exec_()
             asset_name = input_assetname.text()
             token = str(RandomTokenGenerator())
@@ -1417,27 +1373,27 @@ class OmniConnectionSettingsPanel:
                         GetAuthCheck(stplink,  filetype='stp')
                         GetAuthCheck(usdlink,  filetype='usd')
                     else:
-                        msgBox = QtGui.QMessageBox()
-                        msgBox.setIcon(QtGui.QMessageBox.Critical)
+                        msgBox = QtWidgets.QMessageBox()
+                        msgBox.setIcon(QtWidgets.QMessageBox.Critical)
                         msgBox.setText(error_text)
                         msgBox.exec_()
                         self.dialogBoxCreateNewAsset()
                 else:
-                    msgBox = QtGui.QMessageBox()
-                    msgBox.setIcon(QtGui.QMessageBox.Warning)
+                    msgBox = QtWidgets.QMessageBox()
+                    msgBox.setIcon(QtWidgets.QMessageBox.Warning)
                     msgBox.setText("Asset names must start with a letter. \nIt can contain letters, digits, or underscores, and cannot contain spaces.")
                     msgBox.exec_()
                     self.dialogBoxCreateNewAsset()
             else:
                 print('[WARN] No asset name specified!')
-                msgBox = QtGui.QMessageBox()
-                msgBox.setIcon(QtGui.QMessageBox.Warning)
+                msgBox = QtWidgets.QMessageBox()
+                msgBox.setIcon(QtWidgets.QMessageBox.Warning)
                 msgBox.setText("No asset name specified!")
                 msgBox.exec_()
         else:
             print('[WARN] No project link specified or found!')
-            msgBox = QtGui.QMessageBox()
-            msgBox.setIcon(QtGui.QMessageBox.Warning)
+            msgBox = QtWidgets.QMessageBox()
+            msgBox.setIcon(QtWidgets.QMessageBox.Warning)
             msgBox.setText("No project link specified or found!")
             msgBox.exec_()
 
@@ -1460,7 +1416,7 @@ class OmniConnectionSettingsPanel:
                     dialog_txt = "Found "+ str(len(item_list_short)-1) +' geometry assets. Select one or create new asset:'
                 else:
                     dialog_txt = "Found " +'1 geometry asset. Select it or create new asset:'
-                item_short, ok = QtGui.QInputDialog.getItem(self.form, "Omniverse Connector for FreeCAD", dialog_txt, item_list_short, 0, False)
+                item_short, ok = QtWidgets.QInputDialog.getItem(self.form, "Omniverse Connector for FreeCAD", dialog_txt, item_list_short, 0, False)
                 if ok and item_short:
                     if item_short !=new_asset_string:
                         self.selected_asset = item_short
@@ -1481,25 +1437,25 @@ class OmniConnectionSettingsPanel:
                         self.dialogBoxCreateNewAsset()
             elif item_list==None and usd_list==None:
                 print('No assets found.')
-                msg = QtGui.QMessageBox()
-                msg.setIcon(QtGui.QMessageBox.Question)
+                msg = QtWidgets.QMessageBox()
+                msg.setIcon(QtWidgets.QMessageBox.Question)
                 msg.setText('No assets found. Create new?')
-                msg.setStandardButtons(QtGui.QMessageBox.Ok | QtGui.QMessageBox.Cancel)
+                msg.setStandardButtons(QtWidgets.QMessageBox.Ok | QtWidgets.QMessageBox.Cancel)
                 ret = msg.exec_()
-                if ret==QtGui.QMessageBox.Ok:
+                if ret==QtWidgets.QMessageBox.Ok:
                     self.dialogBoxCreateNewAsset()
         else:
             print('[WARN] No project link specified!')
-            msgBox = QtGui.QMessageBox()
-            msgBox.setIcon(QtGui.QMessageBox.Warning)
+            msgBox = QtWidgets.QMessageBox()
+            msgBox.setIcon(QtWidgets.QMessageBox.Warning)
             msgBox.setText("No project link specified!")
             msgBox.exec_()            
     def accept(self):
         FreeCADGui.Control.closeDialog() #close the dialog
 
     def _warn(self, msg):
-        box = QtGui.QMessageBox()
-        box.setIcon(QtGui.QMessageBox.Warning)
+        box = QtWidgets.QMessageBox()
+        box.setIcon(QtWidgets.QMessageBox.Warning)
         box.setText(msg)
         box.exec_()
 
@@ -1509,7 +1465,7 @@ class _GetURLPanel:
     """
 
     def Activated(self):
-        baseWidget = QtGui.QWidget()
+        baseWidget = QtWidgets.QWidget()
         panel = OmniConnectionSettingsPanel(baseWidget)
         FreeCADGui.Control.showDialog(panel)
 
@@ -1534,7 +1490,7 @@ class _GetAssemblyPanel:
     """
 
     def Activated(self):
-        baseWidget = QtGui.QWidget()
+        baseWidget = QtWidgets.QWidget()
         panel = OmniverseAssemblyPanel(baseWidget)
         FreeCADGui.Control.showDialog(panel)
 
