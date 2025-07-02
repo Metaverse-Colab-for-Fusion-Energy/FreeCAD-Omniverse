@@ -3,6 +3,7 @@ from utils import *
 import shutil
 import FreeCAD
 import subprocess
+import Import
 __dir__ = os.path.dirname(__file__)
 
 
@@ -44,6 +45,49 @@ def GetAuthCheck(usdlink, filetype='usd', secondary=False):
 
     print('[ERRORS]', stderr_output)
     return stdout_lines, stderr_output, permission
+
+def DownloadSTPFromNucleus(stplink, token, custom_checkpoint=None):
+    """
+    Downloads a STEP (.stp) file from Nucleus and inserts it into the active FreeCAD document.
+    """
+    imported_object, fc_err = None, None
+    permission = GetCurrentSTPPermissions()
+    print(f'File permission: {permission}')
+
+    if permission != 'OK_ACCESS':
+        err_map = {
+            'NO_ACCESS': '[ERROR] NO_PERMISSION',
+            None: '[ERROR] PERMISSION_NOT_FOUND'
+        }
+        fc_err = f"{err_map.get(permission, '[ERROR] UNKNOWN')} : Cannot access STP file: {stplink}"
+        print(fc_err)
+        return False, None, 'FAIL', err_map.get(permission, 'UNKNOWN'), fc_err
+
+    batch_path = os.path.join(GetFetcherScriptsDirectory().replace(" ", "` "), GetBatchFileName())
+    local_dir = GetLocalDirectoryName()
+    stp_path = os.path.join(local_dir, f'{token}download.stp')
+
+    cmd = (
+        f'{batch_path} --nucleus_url {stplink} --pull_non_usd '
+        f'--local_non_usd_filename {stp_path.replace(" ", "` ")} --token {token}'
+    )
+    if custom_checkpoint:
+        cmd += f' --custom_checkpoint "{custom_checkpoint}"'
+    print(f'[CMD] {cmd}')
+
+    p = subprocess.Popen(['powershell', cmd], shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    stdout, stderr = p.communicate()
+    stdout, stderr = stdout.decode(), stderr.decode()
+
+    if os.path.exists(stp_path) and not check_file_isempty(stp_path):
+        imported_object= Import.insert(stp_path, FreeCAD.ActiveDocument.Name, useLinkGroup=True, merge=False)
+        imported_object = imported_object[0][0]
+        return True, imported_object, stdout, stderr, None
+
+    fc_err = '[ERROR] EMPTY_ASSET: Placeholder or failed download.' if os.path.exists(stp_path) else '[ERROR] DLOAD_FAIL: STP download failed!'
+    print(fc_err)
+    return False, None, stdout, stderr, fc_err
+
 
 def GetFetcherScriptsDirectory():
     workbench_path = os.path.dirname(os.path.realpath(__file__))
