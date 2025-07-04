@@ -5,7 +5,7 @@ This software makes CAD geometry created on FreeCAD available on NVIDIA Omnivers
 
 ## System requirements (what we have tested this to work on)
 - OS: Windows 10 and 11
-- FreeCAD: 0.20, 0.21.1, 0.21.2
+- FreeCAD: 0.20, 0.21.1, 0.21.2, **1.0**, **1.0.1**
 - Nucleus: Local and remote
 - Omniverse Connect Sample: 202.0
 ---
