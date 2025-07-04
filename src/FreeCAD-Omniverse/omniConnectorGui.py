@@ -97,134 +97,6 @@ def FindUSDandSTPFiles(usdlink):
 
     return stdout_lines, stderr_output
 
-
-def UploadUSDToNucleus(usdlink, selected_object, token, secondary=False, overwrite_history=False):
-    """
-    Uploads a mesh (converted to STL) to a Nucleus USD location using a batch script.
-
-    Args:
-        usdlink (str): Nucleus USD URL (primary or secondary depending on 'secondary').
-        selected_object (FreeCAD object): The object to export and upload.
-        token (str): Unique identifier for the upload session.
-        secondary (bool): Whether this is a secondary (fallback) USD location.
-        overwrite_history (bool): If True, creates a fresh USd with zero version history
-
-    Returns:
-        tuple: (stdout_output, stderr_output)
-    """
-    # Get permissions for primary or secondary USD
-    permission = GetCurrentUSDPermissions(secondary=secondary)
-
-    if permission == 'NO_ACCESS':
-        print(f'[ERROR] NO_PERMISSION: Cannot access USD file: {usdlink}')
-        print('[ERROR] You do not have permissions to access this file! Contact your Nucleus administrator.')
-        return 'FAIL', 'NO_PERMISSION'
-
-    if permission is None:
-        print(f'[ERROR] PERMISSION_NOT_FOUND: Cannot access USD file: {usdlink}')
-        print('[ERROR] You have not entered a valid USD link.')
-        return 'FAIL', 'PERMISSION_NOT_FOUND'
-
-    if permission == 'OK_ACCESS':
-        script_dir = GetFetcherScriptsDirectory().replace(" ", "` ")
-        batch_file = GetBatchFileName()
-        batch_path = os.path.join(script_dir, batch_file)
-
-        local_dir = GetLocalDirectoryName()
-        stl_filename = f'{token}upload.stl'
-        stl_path = os.path.join(local_dir, stl_filename)
-
-        print(f'[INFO] Exporting mesh to: {stl_path}')
-        print(f'[INFO] Upload token: {token}')
-
-        # Export to STL file
-        Mesh.export([selected_object], stl_path)
-
-        # Select push or overwrite mode
-        action_flag = '--create_new_usd' if overwrite_history else '--push'
-
-        # Build command
-        cmd = f'{batch_path} --nucleus_url {usdlink} --local_directory {local_dir.replace(" ", "` ")} {action_flag} --token {token}'
-        print(f'[CMD] {cmd}')
-
-        process = subprocess.Popen(
-            ['powershell', cmd],
-            shell=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE
-        )
-        stdout, stderr = process.communicate()
-        return stdout.decode('utf-8'), stderr.decode('utf-8')
-
-    return 'FAIL', 'UNKNOWN_PERMISSION_STATUS'
-
-
-def UploadSTPToNucleus(stplink, selected_object, token, custom_checkpoint=None, secondary=False):
-    """
-    Uploads a STEP file to Nucleus using the batch uploader.
-
-    Args:
-        stplink (str): The Nucleus STP destination URL.
-        selected_object (FreeCAD object): The object to export and upload.
-        token (str): Unique identifier for the upload session.
-        custom_checkpoint (str, optional): A string to tag this upload with a custom label.
-        secondary (bool): Use secondary permission rules if True.
-
-    Returns:
-        tuple: (stdout_output, stderr_output)
-    """
-
-    permission = GetCurrentSTPPermissions(secondary=secondary)
-
-    if permission == 'NO_ACCESS':
-        print(f'[ERROR] NO_PERMISSION: Cannot access STP file: {stplink}')
-        print('[ERROR] You do not have permissions to access this file! Contact your Nucleus administrator.')
-        return 'FAIL', 'NO_PERMISSION'
-
-    if permission is None:
-        print(f'[ERROR] PERMISSION_NOT_FOUND: Cannot access STP file: {stplink}')
-        print('[ERROR] You have not entered a valid Nucleus link.')
-        return 'FAIL', 'PERMISSION_NOT_FOUND'
-
-    if permission != 'OK_ACCESS':
-        return 'FAIL', 'UNKNOWN_PERMISSION_STATUS'
-
-    # Setup paths
-    script_dir = GetFetcherScriptsDirectory().replace(" ", "` ")
-    batch_file = GetBatchFileName()
-    batch_path = os.path.join(script_dir, batch_file)
-    local_dir = GetLocalDirectoryName()
-    stp_filename = f'{token}upload.stp'
-    stp_path = os.path.join(local_dir, stp_filename)
-
-    print('Unique version identifier:', token)
-    print('local_STP_filepath:', stp_path)
-
-    # Export to .stp
-    Import.export([selected_object], stp_path)
-
-    # Build command
-    cmd = (
-        f'{batch_path} --nucleus_url {stplink} '
-        f'--local_non_usd_filename {stp_path.replace(" ", "` ")} '
-        f'--push_non_usd --token {token}'
-    )
-
-    if custom_checkpoint:
-        checkpoint_escaped = f'"{custom_checkpoint}"'
-        cmd += f' --custom_checkpoint {checkpoint_escaped}'
-
-    print(f'[CMD] {cmd}')
-
-    process = subprocess.Popen(
-        ['powershell', cmd],
-        shell=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE
-    )
-    stdout, stderr = process.communicate()
-    return stdout.decode('utf-8'), stderr.decode('utf-8')
-
 def DownloadUSDFromNucleus(usdlink):
     """
     Deprecated function. USDs are now not downloaded from Nucleus. Attempts to pull a USD file from Nucleus and insert the resulting STL if permitted.
@@ -290,31 +162,7 @@ def DownloadUSDFromNucleus(usdlink):
     return stdout_decoded, stderr_decoded
 
 
-def CreateNewProjectOnNucleus(host_name, project_name, make_public=False):
-    """
-    Creates a new project directory on Nucleus.
 
-    Args:
-        host_name (str): Nucleus host.
-        project_name (str): Name of the project to create.
-        make_public (bool): Whether the project should be public.
-
-    Returns:
-        tuple: (ok, stdout_lines, stderr_lines)
-    """
-    batch_path = os.path.join(GetFetcherScriptsDirectory().replace(" ", "` "), GetBatchFileName())
-    cmd = (
-        f'{batch_path} --create_new_project --project_name {project_name} '
-        f'--host_name {host_name} {"--make_public" if make_public else ""}'
-    )
-
-    print(f'[CMD] {cmd}')
-    p = subprocess.Popen(['powershell', cmd], shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    stdout, stderr = p.communicate()
-    stdout_decoded, stderr_decoded = stdout.decode(), stderr.decode()
-
-    ok = "error" not in stdout_decoded.lower()
-    return ok, stdout_decoded.split('\n'), stderr_decoded.split('\n')
 
 def CreateNewAssemblyOnNucleus(projectURL, assembly_name='assembly',
                                 assembly_items_usd_links=None, assembly_items_stp_links=None, token=None):
@@ -418,39 +266,7 @@ def GetPrimReferenceXForms(assemblyURL, token=None):
 
     return stdout_lines, stderr_lines, prim_data or None
 
-def CreateNewAssetOnNucleus(asset_name, use_url=True, projectURL=None, host_name=None, project_name=None, token=None):
-    """
-    Creates a new asset on Nucleus and returns associated links and any error.
 
-    Returns:
-        tuple: (stdout_lines, stderr_lines, stplink, usdlink, error)
-    """
-    batch_path = os.path.join(GetFetcherScriptsDirectory().replace(" ", "` "), GetBatchFileName())
-
-    if use_url:
-        cmd = f'{batch_path} --create_new_asset --nucleus_url {projectURL} --asset_name {asset_name}'
-    else:
-        cmd = f'{batch_path} --create_new_asset --project_name {project_name} --host_name {host_name} --asset_name {asset_name}'
-    if token:
-        cmd += f' --token {token}'
-    print(f'[CMD] {cmd}')
-    p = subprocess.Popen(['powershell', cmd], shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    stdout, stderr = p.communicate()
-    stdout_lines = stdout.decode().split('\n')
-    stderr_lines = stderr.decode().split('\n')
-
-    stplink = usdlink = error = None
-    for line in map(str.strip, stdout_lines):
-        if '.usd' in line:
-            usdlink = line
-            print(usdlink)
-        elif '.stp' in line:
-            stplink = line
-            print(stplink)
-        elif 'ERROR' in line:
-            error = line
-            usdlink = stplink = None
-    return stdout_lines, stderr_lines, stplink, usdlink, error
 
 
 def _DownloadCmdWrapper(stplink, usdlink, token, custom_checkpoint=None):
