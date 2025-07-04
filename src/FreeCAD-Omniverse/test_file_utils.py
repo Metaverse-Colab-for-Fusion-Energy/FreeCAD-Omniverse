@@ -9,13 +9,10 @@ class TestDownloadSTPFromNucleusRealBatch(unittest.TestCase):
         usdlink = "omniverse://mcfe-nucleus.soe.manchester.ac.uk/Projects/FreeCAD/sampleProject/assets/engineering_object/engineering_object.stp"
         token = "testtoken123"
 
-        # ✅ Create dummy FreeCAD document
         doc = FreeCAD.newDocument("TestDoc")
 
-        # 🔧 Call function
         success, imported_object, stdout, stderr, fc_err = DownloadSTPFromNucleus(usdlink, token)
 
-        # 🧪 Test results — do not fail if access denied
         self.assertIn(success, [True, False])
         if success:
             self.assertIsNotNone(imported_object)
@@ -25,7 +22,6 @@ class TestDownloadSTPFromNucleusRealBatch(unittest.TestCase):
             print("[stderr]\n", stderr)
             print("[fc_err]\n", fc_err)
 
-        # 🧹 Clean up the dummy document
         FreeCAD.closeDocument("TestDoc")
 
 class TestGetAuthCheckRealBatch(unittest.TestCase):
