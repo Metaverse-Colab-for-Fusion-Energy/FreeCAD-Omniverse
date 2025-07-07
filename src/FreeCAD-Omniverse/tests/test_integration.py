@@ -6,10 +6,10 @@ import FreeCAD
 import Part
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from file_utils import GetAuthCheck, DownloadSTPFromNucleus, ClearLocalDirectory, UploadUSDToNucleus, CreateNewAssetOnNucleus, CreateNewProjectOnNucleus, UploadSTPToNucleus
+from file_utils import GetAuthCheck, DownloadSTPFromNucleus, ClearLocalDirectory, UploadUSDToNucleus, CreateNewAssetOnNucleus, CreateNewProjectOnNucleus, UploadSTPToNucleus, GetLocalDirectoryName
 
 # === Global Omniverse server config ===
-# Input your real hostname here:
+# Input real hostname here:
 HOSTNAME = "mcfe-nucleus.soe.manchester.ac.uk"
 
 # Leave as is
@@ -28,9 +28,9 @@ TOKEN = "TEST_TOKEN_123"
 
 
 class TestFreeCADImport(unittest.TestCase):
+    # Test if we can import the workbench into FreeCAD's python
     def test_import_omniConnectorGui(self):
-        # Mock GUI import as cannot do this via console testing
-        sys.modules["FreeCADGui"] = MagicMock()
+        sys.modules["FreeCADGui"] = MagicMock() # Mock GUI Import 
         sys.modules["FreeCADGui"].addCommand = MagicMock()
 
         try:
@@ -49,14 +49,13 @@ class TestFreeCADImport(unittest.TestCase):
             self.fail(f"Failed to import utils: {e}")
 
 class TestRealCreateNewProject(unittest.TestCase):
+    # Test if we can create a new project
     def test_create_new_project_on_nucleus(self):
-
-        # Unique project name to avoid collision
         project_name = PROJECT_NAME
         ok, stdout_lines, stderr_lines = CreateNewProjectOnNucleus(
             host_name=HOSTNAME,
             project_name=project_name,
-            make_public=False  # or True if you want everyone to see it
+            make_public=False
         )
 
         print("\n[STDOUT]")
@@ -64,12 +63,13 @@ class TestRealCreateNewProject(unittest.TestCase):
         print("\n[STDERR]")
         print("\n".join(stderr_lines))
 
-        # Allow pass even if project already exists
+        # Allow pass if project already exists - we just test if we can trigger it
         if not ok:
             combined = "\n".join(stdout_lines + stderr_lines)
             self.assertIn("already_exists", combined.lower(), "Project creation failed unexpectedly.")
 
 class TestRealCreateNewAsset(unittest.TestCase):
+    # test if we can create a new asset
     def test_create_new_asset_on_nucleus(self):
         project_url = PROJECT_URL
         asset_name = TEST_ASSET_NAME
@@ -91,16 +91,19 @@ class TestRealCreateNewAsset(unittest.TestCase):
         print("USD Link:", usdlink)
         print("Error:", error)
 
-        # Accept if asset already exists (idempotent behavior)
+        # Accept if asset already exists - just testing if we can trigger asset creation
         if error is not None and "ERROR_ALREADY_EXISTS" not in error:
             self.fail(f"Asset creation failed with error: {error}")
 
-        # Even if the asset exists, links should be non-empty if accessible
+        # Check if stp & usd links are valid or do not return at all
         self.assertTrue(usdlink is None or usdlink.endswith((".usd", ".usda")))
+        # also check that stplink is either valid or is not returned
+        self.assertTrue(stplink is None or stplink.endswith((".stp")))
 
 class TestGetAuthCheckRealBatch(unittest.TestCase):
-
+    # test if we can authenticate with nucleus instance 
     def test_real_project_access_or_expected_denial(self):
+        # Test if we can access the project we just made before
         ClearLocalDirectory()
         usdlink = PROJECT_URL
         stdout, stderr, permission = GetAuthCheck(usdlink, filetype='project')
@@ -124,6 +127,7 @@ class TestGetAuthCheckRealBatch(unittest.TestCase):
             self.fail(f"Unexpected permission result: {permission}")
 
     def test_real_usda_access_or_expected_denial(self):
+        # test if we can access the asset that we just made 
         usdlink = USD_LINK
         stdout, stderr, permission = GetAuthCheck(usdlink, filetype='usd')
 
@@ -147,6 +151,7 @@ class TestGetAuthCheckRealBatch(unittest.TestCase):
             self.fail(f"Unexpected permission result: {permission}")
 
     def test_real_stp_access_or_expected_denial(self):
+        # also check the stp file of said asset
         stplink = STP_LINK
         stdout, stderr, permission = GetAuthCheck(stplink, filetype='stp')
 
@@ -169,6 +174,7 @@ class TestGetAuthCheckRealBatch(unittest.TestCase):
             self.fail(f"Unexpected permission result: {permission}")
 
     def test_invalid_project(self):
+        # now test if we switch to a fake project that we didnt make
         ClearLocalDirectory()
         usdlink = DUMMY_PROJECT_URL
         stdout, stderr, permission = GetAuthCheck(usdlink, filetype='project')
@@ -188,9 +194,9 @@ class TestGetAuthCheckRealBatch(unittest.TestCase):
             msg="NO_ACCESS was returned but no valid denial reason was found in output"
         )
 
-class TestRealSTPUpload(unittest.TestCase):
+class TestUploadAssetToNucleusReal(unittest.TestCase):
     def test_real_stp_upload_to_nucleus(self):
-        # Required setup
+        # now test if we can push a STP file of a box to nucleus
         stplink = STP_LINK
         token = TOKEN
 
@@ -201,11 +207,8 @@ class TestRealSTPUpload(unittest.TestCase):
         box.Width = 10
         box.Height = 10
         doc.recompute()
-
-        # Upload the object
         stdout, stderr = UploadSTPToNucleus(stplink, box, token)
-
-        # Output results
+        
         print("\n[STDOUT]:")
         print(stdout)
         print("\n[STDERR]:")
@@ -217,9 +220,8 @@ class TestRealSTPUpload(unittest.TestCase):
 
         FreeCAD.closeDocument("UploadTestDoc")
 
-
-class TestRealUSDUpload(unittest.TestCase):
     def test_real_usd_upload_to_nucleus(self):
+        # also test if we can push the USD side of the asset
         usdlink = USD_LINK
         token = TOKEN
 
@@ -243,9 +245,10 @@ class TestRealUSDUpload(unittest.TestCase):
         FreeCAD.closeDocument("UploadTestDocUSD")
 
 
-class TestDownloadSTPFromNucleusRealBatch(unittest.TestCase):
+class TestDownloadAssetFromNucleus(unittest.TestCase):
 
     def test_download_stp_from_real_nucleus(self):
+        # now test if we can pull a STP file from the nucleus. We don't do USD pull because this isn't done anyway in the user workflow.
         stplink = STP_LINK
         token = TOKEN
 
@@ -262,29 +265,25 @@ class TestDownloadSTPFromNucleusRealBatch(unittest.TestCase):
             print("\n[stdout]\n", stdout)
             print("[stderr]\n", stderr)
             print("[fc_err]\n", fc_err)
-
         FreeCAD.closeDocument("TestDoc")
 
-    def test_download_usd_from_real_nucleus(self):
-        usdlink = USD_LINK
-        token = TOKEN
+class TestClearAll(unittest.TestCase):
+    def test_clear_temp_files(self):
+        dir_path = GetLocalDirectoryName()
+        print(f"Before clear: contents of {dir_path} -> {os.listdir(dir_path)}")
 
-        doc = FreeCAD.newDocument("TestDoc")
         ClearLocalDirectory()
 
-        success, imported_object, stdout, stderr, fc_err = DownloadSTPFromNucleus(usdlink, token)
+        print(f"After clear: contents of {dir_path} -> {os.listdir(dir_path)}")
 
-        self.assertIn(success, [True, False])
-        if success:
-            self.assertIsNotNone(imported_object)
-        else:
-            self.assertIsNone(imported_object)
-            print("\n[stdout]\n", stdout)
-            print("[stderr]\n", stderr)
-            print("[fc_err]\n", fc_err)
-
-        FreeCAD.closeDocument("TestDoc")
-
+        self.assertTrue(
+            not os.listdir(dir_path), 
+            f"Directory {dir_path} is not empty after ClearLocalDirectory()"
+        )
 
 if __name__ == '__main__':
-    unittest.main()
+    unittest.main(buffer=False, exit=False)
+    # Double making sure that the temp files are removed at the end. 
+    print('-------END OF TEST-------')
+    print("[INFO] Cleaning up session_local...")
+    ClearLocalDirectory()
