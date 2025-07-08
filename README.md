@@ -3,6 +3,8 @@ This software makes CAD geometry created on FreeCAD available on NVIDIA Omnivers
 
 ![freecad-conn](https://github.com/raska-s/FreeCAD-Omniverse/assets/75393569/d849faed-d431-49b6-a44b-b1243f19e34d)
 
+The project includes sources from Omniverse Connect Sample v202.0. https://github.com/NVIDIA-Omniverse/connect-samples, which is licensed under the MIT license.
+
 ## System requirements (what we have tested this to work on)
 - OS: Windows 10 and 11
 - FreeCAD: 0.20, 0.21.1, 0.21.2, **1.0**, **1.0.1**
