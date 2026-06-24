@@ -1,5 +1,7 @@
 # FreeCAD Connector for NVIDIA Omniverse
-This software makes CAD geometry created on FreeCAD available on NVIDIA Omniverse in STEP and USD formats.
+This software makes CAD geometry created on FreeCAD available on NVIDIA Omniverse in STEP and USD formats. 
+
+Further information regarding this software can be found [[here](url)](https://openresearchsoftware.metajnl.com/articles/10.5334/jors.559)
 
 ![freecad-conn](https://github.com/raska-s/FreeCAD-Omniverse/assets/75393569/d849faed-d431-49b6-a44b-b1243f19e34d)
 
